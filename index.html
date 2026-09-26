@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>The Far Side — Beyond the Highlight</title>
+<meta name="description" content="An interactive Moon experience about the feelings behind polished social media moments. Travel from the highlight side of the Moon to its far side, read anonymous two-sided stories, and send a quiet signal of support." />
+<meta name="theme-color" content="#05060d" />
+
+<meta property="og:title" content="The Far Side — Beyond the Highlight" />
+<meta property="og:description" content="Every highlight has a story outside the frame." />
+<meta property="og:type" content="website" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23e8e2d6'/%3E%3Ccircle cx='22' cy='13' r='11' fill='%23070912'/%3E%3C/svg%3E" />
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&display=swap" />
+
+<link rel="stylesheet" href="./styles/base.css" />
+<link rel="stylesheet" href="./styles/ui.css" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js"
+  }
+}
+</script>
+</head>
+
+<body data-phase="loading">
+
+  <!-- ============ 3D layer ============ -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+
+  <!-- Far-side story lights, projected from 3D to screen space -->
+  <div id="markers" class="markers" aria-hidden="true"></div>
+
+  <!-- ============ Persistent chrome ============ -->
+  <header id="chrome" class="chrome">
+    <div class="brand">
+      <span class="brand__moon" aria-hidden="true"></span>
+      <span class="brand__text">
+        <strong>The Far Side</strong>
+        <em>Beyond the Highlight</em>
+      </span>
+    </div>
+
+    <nav class="chrome__controls">
+      <button id="btn-mute" class="icon-btn" type="button" aria-pressed="false" title="Mute sound">
+        <span class="icon-btn__glyph" data-on="♪" data-off="✕">♪</span>
+        <span class="icon-btn__label">Sound</span>
+      </button>
+      <button id="btn-restart" class="icon-btn" type="button" title="Start the journey again">
+        <span class="icon-btn__glyph">↺</span>
+        <span class="icon-btn__label">Restart</span>
+      </button>
+    </nav>
+  </header>
+
+  <ol id="progress" class="progress" aria-label="Journey progress">
+    <li data-step="bright"><span>Arrive</span></li>
+    <li data-step="flight"><span>Fly</span></li>
+    <li data-step="far"><span>Discover</span></li>
+    <li data-step="signal"><span>Respond</span></li>
+    <li data-step="closing"><span>Return</span></li>
+  </ol>
+
+  <!-- ============ Screens ============ -->
+  <main id="ui">
+
+    <!-- 0. Loading ------------------------------------------------ -->
+    <section class="screen screen--center is-active" id="screen-loading">
+      <div class="loading">
+        <div class="loading__moon" aria-hidden="true"></div>
+        <p class="loading__text">Reaching the Moon…</p>
+      </div>
+    </section>
+
+    <!-- 1. Intro -------------------------------------------------- -->
+    <section class="screen screen--center" id="screen-intro" aria-labelledby="intro-title">
+      <div class="panel panel--intro">
+        <p class="eyebrow">An interactive Moon experience</p>
+        <h1 id="intro-title" class="display">The Far Side</h1>
+        <p class="tagline">Every highlight has a story outside the frame.</p>
+        <p class="lede">
+          Social media shows us outcomes: the acceptance, the celebration, the smiling
+          group photo. It rarely shows the rejection, the homesickness, the pressure
+          standing just outside the frame.
+        </p>
+        <p class="lede lede--quiet">
+          Both sides can be true at once. Someone can be proud of an achievement and
+          still feel lonely, exhausted, or uncertain.
+        </p>
+        <button id="btn-begin" class="btn btn--primary btn--lg" type="button">
+          Fly me to the Moon
+        </button>
+        <p class="fineprint">
+          The stories on the far side are <strong>clearly labelled samples</strong>,
+          written for this demo. Anything you write stays in your own browser.
+          <a href="#notice-safety" data-open-notice="safety">Support resources →</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- 2. Bright side -------------------------------------------- -->
+    <section class="screen screen--bright" id="screen-bright" aria-labelledby="bright-title">
+      <h2 id="bright-title" class="sr-only">The highlight side of the Moon</h2>
+      <div id="feed" class="feed"></div>
+      <div id="toasts" class="toasts" aria-hidden="true"></div>
+      <p class="hint hint--bottom">
+        <span class="hint__pulse" aria-hidden="true"></span>
+        Pick a post. Ask what might be outside its frame.
+      </p>
+    </section>
+
+    <!-- 3. Selected post sheet ------------------------------------ -->
+    <section class="screen screen--center screen--scrim" id="screen-post" aria-labelledby="post-title">
+      <div class="panel panel--post">
+        <button class="panel__close" type="button" data-close-post aria-label="Back to the feed">×</button>
+        <h2 id="post-title" class="sr-only">Selected post</h2>
+        <div id="post-card"></div>
+        <div class="post-question">
+          <p class="post-question__q">What might be outside this frame?</p>
+          <p class="post-question__hint" id="post-hint"></p>
+        </div>
+        <div class="row">
+          <button id="btn-see-other-side" class="btn btn--primary" type="button">
+            See the other side
+          </button>
+          <button class="btn btn--ghost" type="button" data-close-post>Back to the feed</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Flight ------------------------------------------------- -->
+    <section class="screen screen--flight" id="screen-flight" aria-live="polite">
+      <div class="flight">
+        <p id="flight-line" class="flight__line"></p>
+        <div class="flight__track" aria-hidden="true"><span id="flight-fill"></span></div>
+        <div class="row row--center">
+          <button id="btn-skip" class="btn btn--ghost btn--sm" type="button">Skip flight</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Far side ----------------------------------------------- -->
+    <section class="screen screen--far" id="screen-far">
+      <div class="far-top">
+        <div class="filters" role="group" aria-label="Filter stories by experience">
+          <span class="filters__label">Explore by experience</span>
+          <div id="filter-chips" class="filters__chips"></div>
+        </div>
+      </div>
+
+      <aside id="story-panel" class="story-panel" aria-live="polite" aria-labelledby="story-heading">
+        <button class="panel__close" type="button" data-close-story aria-label="Close story">×</button>
+        <span id="story-theme" class="chip chip--theme"></span>
+        <p class="story-panel__seen-label">What people saw</p>
+        <blockquote id="story-seen" class="story-panel__seen"></blockquote>
+        <h3 id="story-heading" class="story-panel__label">Outside the frame</h3>
+        <p id="story-text" class="story-panel__text"></p>
+        <p id="story-note" class="story-panel__note"></p>
+
+        <div class="signals" id="signals">
+          <p class="signals__label">Send a signal through the lunar relay</p>
+          <div id="signal-buttons" class="signals__buttons"></div>
+          <p id="signal-status" class="signals__status" aria-live="polite"></p>
+        </div>
+
+        <div class="story-panel__nav">
+          <button class="btn btn--ghost btn--sm" type="button" data-story-step="-1">‹ Previous light</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-story-step="1">Next light ›</button>
+        </div>
+      </aside>
+
+      <div class="far-bottom">
+        <p class="far-hint" id="far-hint">
+          Drag to turn the Moon. Every light is a story someone did not post.
+        </p>
+        <div class="row row--center">
+          <button id="btn-contribute" class="btn btn--primary" type="button">Add your two sides</button>
+          <button id="btn-return" class="btn btn--ghost" type="button">Return to Earth</button>
+        </div>
+        <p class="constellation-count" id="constellation-count"></p>
+      </div>
+    </section>
+
+    <!-- 6. Contribute --------------------------------------------- -->
+    <section class="screen screen--center screen--scrim" id="screen-contribute" aria-labelledby="contribute-title">
+      <div class="panel panel--wide">
+        <button class="panel__close" type="button" data-close-contribute aria-label="Close">×</button>
+        <p class="eyebrow">Your turn</p>
+        <h2 id="contribute-title" class="display display--sm">Two lines, two sides</h2>
+        <p class="lede lede--tight">
+          You do not have to explain or resolve anything. Two short lines is enough.
+        </p>
+
+        <form id="contribute-form" class="form" novalidate>
+          <label class="field">
+            <span class="field__label">What people might see</span>
+            <textarea id="input-bright" class="field__input" rows="2" maxlength="160"
+              placeholder="I'm doing well in my classes." required></textarea>
+            <span class="field__count" data-count-for="input-bright">0 / 160</span>
+          </label>
+
+          <label class="field field--warm">
+            <span class="field__label">What they might not see</span>
+            <textarea id="input-far" class="field__input" rows="3" maxlength="240"
+              placeholder="I'm afraid to admit how overwhelmed I feel." required></textarea>
+            <span class="field__count" data-count-for="input-far">0 / 240</span>
+          </label>
+
+          <fieldset class="field field--row">
+            <legend class="field__label">Which experience is this closest to?</legend>
+            <div id="contribute-themes" class="filters__chips"></div>
+          </fieldset>
+
+          <p class="form__error" id="contribute-error" role="alert"></p>
+
+          <div class="row">
+            <button class="btn btn--primary" type="submit" data-intent="private">Keep private</button>
+            <button class="btn btn--secondary" type="submit" data-intent="shared">
+              Submit for anonymous sharing
+            </button>
+          </div>
+          <p class="fineprint">
+            This demo has no server. Either choice saves your words only in
+            <strong>this browser's</strong> local storage, and adds your light to the far
+            side for you. Nothing is uploaded, and you can delete it below.
+          </p>
+        </form>
+
+        <div id="my-lights" class="my-lights"></div>
+      </div>
+    </section>
+
+    <!-- 7. Return to Earth ---------------------------------------- -->
+    <section class="screen screen--center screen--scrim" id="screen-closing" aria-labelledby="closing-title">
+      <div class="panel panel--wide">
+        <p class="eyebrow">Before you go back</p>
+        <h2 id="closing-title" class="display display--sm">Take one small thing with you</h2>
+        <p class="lede lede--tight">
+          Noticing is a start. One act of connection is the part that reaches someone.
+        </p>
+
+        <div id="action-cards" class="action-cards" role="group" aria-label="Choose a small action"></div>
+
+        <div class="checkin" id="checkin" hidden>
+          <p class="checkin__label" id="checkin-label">A message you could send right now</p>
+          <textarea id="checkin-text" class="checkin__text" rows="3" aria-labelledby="checkin-label"></textarea>
+          <div class="row">
+            <button id="btn-copy" class="btn btn--primary btn--sm" type="button">Copy message</button>
+            <span class="checkin__copied" id="copy-status" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <figure class="closing-line">
+          <blockquote>You never see someone's whole sky from one angle.</blockquote>
+        </figure>
+
+        <div class="row">
+          <button id="btn-back-to-far" class="btn btn--ghost" type="button">Back to the far side</button>
+          <button id="btn-restart-2" class="btn btn--ghost" type="button">Start again</button>
+        </div>
+        <p class="fineprint">
+          <a href="#notice-safety" data-open-notice="safety">If you are struggling right now →</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- Safety notice --------------------------------------------- -->
+    <section class="screen screen--center screen--scrim" id="notice-safety" aria-labelledby="safety-title">
+      <div class="panel">
+        <button class="panel__close" type="button" data-close-notice aria-label="Close">×</button>
+        <p class="eyebrow">A note on care</p>
+        <h2 id="safety-title" class="display display--sm">This is an art piece, not a crisis service</h2>
+        <p class="lede lede--tight">
+          The Far Side cannot reply to you, and nobody is monitoring what you write here.
+          If you are in distress or thinking about harming yourself, please talk to a real
+          person tonight.
+        </p>
+        <ul class="resources">
+          <li><strong>US &amp; Canada:</strong> call or text <strong>988</strong> (Suicide &amp; Crisis Lifeline)</li>
+          <li><strong>UK &amp; Ireland:</strong> call <strong>116 123</strong> (Samaritans)</li>
+          <li><strong>Anywhere:</strong>
+            <a href="https://findahelpline.com" target="_blank" rel="noopener noreferrer">findahelpline.com</a>
+          </li>
+          <li>On a campus: your counselling centre almost certainly has same-week urgent slots.</li>
+        </ul>
+        <button class="btn btn--primary" type="button" data-close-notice>Back to the Moon</button>
+      </div>
+    </section>
+
+    <!-- No WebGL --------------------------------------------------- -->
+    <section class="screen screen--center" id="screen-unsupported" aria-labelledby="unsupported-title">
+      <div class="panel">
+        <p class="eyebrow">The Moon could not launch</p>
+        <h2 id="unsupported-title" class="display display--sm">This browser has no WebGL</h2>
+        <p class="lede lede--tight">
+          The Far Side draws a real Moon, so it needs hardware-accelerated
+          graphics. Try Chrome, Edge, Safari 16+ or Firefox with hardware
+          acceleration switched on — or open it on a phone.
+        </p>
+        <p class="lede lede--quiet">
+          The idea survives without the Moon, though: the post you saw is not the
+          whole story, and asking someone how they actually are costs nothing.
+        </p>
+        <figure class="closing-line">
+          <blockquote>You never see someone's whole sky from one angle.</blockquote>
+        </figure>
+        <p class="fineprint">
+          <a href="#notice-safety" data-open-notice="safety">Support resources →</a>
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <noscript>
+    <div class="noscript">
+      <h1>The Far Side</h1>
+      <p>This experience is built with WebGL and needs JavaScript enabled.</p>
+    </div>
+  </noscript>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
