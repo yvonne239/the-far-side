@@ -10,13 +10,28 @@ const MOON_R = 1;
 const LIGHT_R = 1.016;
 
 /**
- * The whole 3D stage: the Moon, the story lights on its far side, the relay
+ * Where the lighting lands at the end of a flight. Both paths fly the same
+ * arc around the same Moon; only the temperature of the arrival differs.
+ *   warm — human stories: lamplight, close, nothing performing
+ *   cool — discoveries: clear, awake, good light to look at something in
+ */
+const MOODS = {
+  warm: { sun: 0.62, farFill: 0.62, earthShine: 0.08, farCool: 0.40, hue: 0.10, sat: 0.15, amb: 0.62, quiet: true },
+  cool: { sun: 0.95, farFill: 0.24, earthShine: 0.10, farCool: 0.72, hue: 0.56, sat: 0.22, amb: 0.54, quiet: false },
+};
+
+/**
+ * The whole 3D stage: the Moon, the lights on its far side, the relay
  * satellite, the flight around the limb, and the signal beams that slowly
  * draw a constellation across the surface.
  *
- * Far-side story lights get a real DOM button projected on top of them, so
- * they are clickable, focusable and screen-reader-visible. The hundreds of
- * ambient "other people" lights are GPU points with no DOM at all.
+ * Far-side lights get a real DOM button projected on top of them, so they are
+ * clickable, focusable and screen-reader-visible. The hundreds of ambient
+ * "other people" lights are GPU points with no DOM at all.
+ *
+ * Lights belong to a `track` — 'story' or 'discovery'. Only the active
+ * track's lights are drawn or projected, so both paths share one Moon
+ * without ever sharing a constellation.
  */
 export class MoonScene {
   constructor(canvas, markerLayer) {
@@ -25,10 +40,13 @@ export class MoonScene {
     this.reduced = prefersReducedMotion();
 
     this.onLightClick = () => {};
-    this.lights = new Map();       // id -> { id, theme, dir, sprite, el, quiet }
+    this.lights = new Map();       // id -> { id, theme, track, dir, sprite, el }
     this.tweens = [];
     this.phase = 'intro';
     this.filter = 'all';
+    this.track = 'story';
+    this.mood = 'warm';
+    this.sunLab = null;
     this.signalled = [];
     this.viewerAnchor = null;
     this.clock = new THREE.Clock();
@@ -286,8 +304,24 @@ export class MoonScene {
     this._initQuietLights();
   }
 
-  addLight({ id, theme, lat, lon, label, mine = false }) {
-    const color = new THREE.Color(mine ? '#fff4d6' : (THEMES[theme]?.color || '#ffb877'));
+  /** The second path's lights: same surface, separate track. */
+  setDiscoveries(discoveries, categories) {
+    discoveries.forEach((d) => {
+      this.addLight({
+        id: d.id,
+        theme: d.category,
+        track: 'discovery',
+        color: categories[d.category]?.color,
+        lat: d.anchor.lat,
+        lon: d.anchor.lon,
+        label: d.front.label,
+        verb: 'Reveal',
+      });
+    });
+  }
+
+  addLight({ id, theme, lat, lon, label, mine = false, track = 'story', color: hex, verb = 'Open story' }) {
+    const color = new THREE.Color(hex || (mine ? '#fff4d6' : (THEMES[theme]?.color || '#ffb877')));
     const dir = surfacePoint(lat, lon, 1);
 
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -302,7 +336,7 @@ export class MoonScene {
     el.type = 'button';
     el.className = 'marker';
     el.style.setProperty('--c', `#${color.getHexString()}`);
-    el.setAttribute('aria-label', `Open story: ${label || 'a story'}`);
+    el.setAttribute('aria-label', `${verb}: ${label || 'this one'}`);
 
     const dot = document.createElement('span');
     dot.className = 'marker__dot';
@@ -321,8 +355,9 @@ export class MoonScene {
     el.tabIndex = -1;
     this.markerLayer.appendChild(el);
 
-    const light = { id, theme, dir, sprite, el, mine, baseScale: 0.2, pulse: 0, visible: false };
+    const light = { id, theme, track, dir, sprite, el, mine, baseScale: 0.2, pulse: 0, visible: false };
     this.lights.set(id, light);
+    this._applyVisibility();
     return light;
   }
 
@@ -372,12 +407,26 @@ export class MoonScene {
     this.moonGroup.add(this.quietLights);
   }
 
+  /** Switch which path's lights exist on the surface at all. */
+  setTrack(track) {
+    if (this.track === track) return;
+    this.track = track;
+    this.filter = 'all';
+    this._applyVisibility();
+  }
+
   setFilter(theme) {
     this.filter = theme || 'all';
+    this._applyVisibility();
+  }
+
+  _applyVisibility() {
     this.lights.forEach((light) => {
-      const on = this.filter === 'all' || light.theme === this.filter;
-      light.el.classList.toggle('is-dim', !on);
-      light.sprite.material.opacity = on ? 0.95 : 0.16;
+      const onTrack = light.track === this.track;
+      const lit = onTrack && (this.filter === 'all' || light.theme === this.filter);
+      light.sprite.visible = onTrack;
+      light.sprite.material.opacity = lit ? 0.95 : 0.16;
+      light.el.classList.toggle('is-dim', onTrack && !lit);
     });
   }
 
@@ -398,14 +447,22 @@ export class MoonScene {
 
   setPhase(phase) {
     this.phase = phase;
-    if (phase === 'bright' || phase === 'post') {
-      this.cam.spin = phase === 'post' ? 0.006 : 0.028;
-    } else if (phase === 'far') {
+    if (phase === 'bright' || phase === 'sights') {
+      this.cam.spin = 0.028;
+    } else if (phase === 'post' || phase === 'sight') {
+      this.cam.spin = 0.006;
+    } else if (this.isFarPhase) {
       this.cam.spin = 0.004;
     } else {
       this.cam.spin = 0.012;
     }
-    this.markerLayer.setAttribute('aria-hidden', phase === 'far' ? 'false' : 'true');
+    if (this.sunLab) this.cam.spin = 0;
+    this.markerLayer.setAttribute('aria-hidden', this.isFarPhase ? 'false' : 'true');
+  }
+
+  /** Both paths end on the far side; only the panel that opens there differs. */
+  get isFarPhase() {
+    return this.phase === 'far' || this.phase === 'discover';
   }
 
   /** Slow drift on the intro/bright side. */
@@ -432,11 +489,13 @@ export class MoonScene {
    * Carry the selected post around the limb to its far-side light.
    * Resolves when the light lands.
    */
-  flyToFarSide(storyId, { duration = 7000, onProgress } = {}) {
+  flyToFarSide(storyId, { duration = 7000, onProgress, mood = 'warm' } = {}) {
     const light = this.lights.get(storyId);
     if (!light) return Promise.resolve();
 
     const dur = this.reduced ? Math.min(duration, 2200) : duration;
+    const M = MOODS[mood] || MOODS.warm;
+    this.mood = mood;
 
     // turn the Moon so the target light ends up facing the camera
     const startRotY = this.moonGroup.rotation.y;
@@ -469,7 +528,7 @@ export class MoonScene {
     this.travel.scale.setScalar(0.62);
     this.travel.visible = true;
     this.travelTrail.visible = true;
-    this.quietLights.visible = true;
+    this.quietLights.visible = M.quiet;
     this.lightGroup.visible = true;
 
     const startCam = { ...this.cam };
@@ -488,14 +547,16 @@ export class MoonScene {
           this.cam.elev = lerp(startCam.elev, 0.17, p) + Math.sin(Math.PI * raw) * 0.1;
           this.moonGroup.rotation.y = startRotY + deltaRot * p;
 
-          // world warms up, the sun falls behind us
-          this.sun.intensity = lerp(2.5, 0.62, p);
-          this.farFill.intensity = lerp(0, 0.62, p);
-          this.earthShine.intensity = lerp(0.22, 0.08, p);
-          this.farCool.intensity = lerp(0, 0.4, p);
-          this.ambient.color.setHSL(lerp(0.62, 0.1, p), lerp(0.4, 0.15, p), 0.23);
-          this.ambient.intensity = lerp(0.42, 0.62, p);
-          if (this.quietLights) this.quietLights.material.opacity = easeOut(clamp((p - 0.45) / 0.55, 0, 1)) * 0.75;
+          // the sun falls behind us, and the world takes on the path's colour
+          this.sun.intensity = lerp(2.5, M.sun, p);
+          this.farFill.intensity = lerp(0, M.farFill, p);
+          this.earthShine.intensity = lerp(0.22, M.earthShine, p);
+          this.farCool.intensity = lerp(0, M.farCool, p);
+          this.ambient.color.setHSL(lerp(0.62, M.hue, p), lerp(0.4, M.sat, p), 0.23);
+          this.ambient.intensity = lerp(0.42, M.amb, p);
+          if (this.quietLights && M.quiet) {
+            this.quietLights.material.opacity = easeOut(clamp((p - 0.45) / 0.55, 0, 1)) * 0.75;
+          }
 
           // the post itself: polished image shrinking to a point of light
           const tp = clamp(p / 0.94, 0, 1);
@@ -554,6 +615,75 @@ export class MoonScene {
     light.pulse = 1;
   }
 
+  /* ================================================================
+     sun lab — the visitor takes the Sun off its rail
+     ================================================================ */
+
+  /**
+   * Hand control of the terminator to the "dark side" discovery. The stylised
+   * far-side fill lights go out, the Sun becomes a real Sun, and the Moon
+   * stops drifting so the only thing moving the light is the visitor.
+   */
+  enterSunLab() {
+    if (this.sunLab) return;
+    this.sunLab = {
+      sun: this.sun.intensity,
+      sunPos: this.sun.position.clone(),
+      farFill: this.farFill.intensity,
+      farCool: this.farCool.intensity,
+      earthShine: this.earthShine.intensity,
+      ambient: this.ambient.intensity,
+      ambientColor: this.ambient.color.clone(),
+      spin: this.cam.spin,
+      rim: this.rim.material.opacity,
+      angle: Math.PI,
+    };
+    this.sun.intensity = 3.1;
+    this.farFill.intensity = 0;
+    this.farCool.intensity = 0;
+    this.earthShine.intensity = 0.05;
+    this.ambient.intensity = 0.1;
+    this.ambient.color.setHex(0x1b2240);
+    this.rim.material.opacity = 0.05;
+    this.cam.spin = 0;
+    this.camVel.angle = 0;
+    this._applySunAngle();
+  }
+
+  /**
+   * @param {number} alpha Sun direction measured from the near side (0 = the
+   *   Sun behind Earth, so the near side is lit; π = the Sun behind the Moon,
+   *   so the far side is lit). Kept relative to the Moon's own frame, which is
+   *   what tidal locking means: the illumination pattern stays put on the
+   *   surface for a given point in the cycle.
+   */
+  setSunAngle(alpha) {
+    if (!this.sunLab) return;
+    this.sunLab.angle = alpha;
+    this._applySunAngle();
+  }
+
+  _applySunAngle() {
+    const a = this.sunLab.angle + this.moonGroup.rotation.y;
+    const D = 9;
+    this.sun.position.set(Math.sin(a) * D, D * 0.22, Math.cos(a) * D);
+  }
+
+  exitSunLab() {
+    if (!this.sunLab) return;
+    const s = this.sunLab;
+    this.sunLab = null;
+    this.sun.intensity = s.sun;
+    this.sun.position.copy(s.sunPos);
+    this.farFill.intensity = s.farFill;
+    this.farCool.intensity = s.farCool;
+    this.earthShine.intensity = s.earthShine;
+    this.ambient.intensity = s.ambient;
+    this.ambient.color.copy(s.ambientColor);
+    this.rim.material.opacity = s.rim;
+    this.cam.spin = s.spin;
+  }
+
   /** Pull back so Earth rises past the limb again for the closing screen. */
   earthRise(dur = 3200) {
     const start = { ...this.cam };
@@ -576,11 +706,13 @@ export class MoonScene {
    * record of people noticing each other, and restarting should not erase it.
    */
   resetCamera() {
+    this.exitSunLab();
     this.tweens.length = 0;
     this.flight = null;
     this.cam = { angle: 0, radius: 3.35, elev: 0.1, spin: 0.028 };
     this.camVel.angle = 0;
     this.moonGroup.rotation.y = 0;
+    this.sun.position.set(2.6, 1.1, 4.2);
     this.sun.intensity = 2.5;
     this.farFill.intensity = 0;
     this.earthShine.intensity = 0.22;
@@ -598,11 +730,10 @@ export class MoonScene {
     this.travelTrail.visible = false;
     this.travelTrail.geometry.setDrawRange(0, 0);
     this.beamGroup.clear();
-    this.lights.forEach((l) => {
-      l.el.classList.remove('is-active', 'is-dim');
-      l.sprite.material.opacity = 0.95;
-    });
+    this.lights.forEach((l) => l.el.classList.remove('is-active'));
     this.filter = 'all';
+    this.mood = 'warm';
+    this._applyVisibility();
   }
 
   /* ================================================================
@@ -817,6 +948,9 @@ export class MoonScene {
       }
     }
 
+    // the Sun is pinned to the Moon's own frame while the visitor holds it
+    if (this.sunLab) this._applySunAngle();
+
     // camera on its orbit
     const { angle, radius, elev } = this.cam;
     const ce = Math.cos(elev);
@@ -865,10 +999,10 @@ export class MoonScene {
     const h = this.canvas.clientHeight;
     const v = new THREE.Vector3();
     const camPos = this.camera.position;
-    const showMarkers = this.phase === 'far';
+    const showMarkers = this.isFarPhase;
 
     this.lights.forEach((light) => {
-      if (!showMarkers) {
+      if (!showMarkers || light.track !== this.track) {
         if (light.visible || light.el.style.pointerEvents !== 'none') {
           light.el.style.opacity = '0';
           light.el.style.pointerEvents = 'none';

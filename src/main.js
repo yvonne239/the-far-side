@@ -1,10 +1,15 @@
 import { MoonScene } from './moon/scene.js';
 import { Soundscape } from './audio/soundscape.js';
 import { Feed, createPostCard } from './ui/feed.js';
+import { Sights, createSightCard } from './ui/sights.js';
 import { FarSide } from './ui/farside.js';
+import { Discover } from './ui/discover.js';
 import { Contribute } from './ui/contribute.js';
 import { Closing } from './ui/closing.js';
 import { STORIES, THEMES, FLIGHT_LINES, getStory } from './data/stories.js';
+import {
+  DISCOVERIES, CATEGORIES, DISCOVERY_FLIGHT_LINES, getDiscovery,
+} from './data/discoveries.js';
 import * as store from './lib/storage.js';
 import { mulberry32, prefersReducedMotion } from './lib/util.js';
 
@@ -17,14 +22,18 @@ const $ = (id) => document.getElementById(id);
 const screens = {
   loading: $('screen-loading'),
   intro: $('screen-intro'),
+  paths: $('screen-paths'),
   bright: $('screen-bright'),
+  sights: $('screen-sights'),
   flight: $('screen-flight'),
   far: $('screen-far'),
+  discover: $('screen-discover'),
   unsupported: $('screen-unsupported'),
 };
 
 const overlays = {
   post: $('screen-post'),
+  sight: $('screen-sight'),
   contribute: $('screen-contribute'),
   closing: $('screen-closing'),
   notice: $('notice-safety'),
@@ -34,15 +43,25 @@ const progressEl = $('progress');
 const flightLine = $('flight-line');
 const flightFill = $('flight-fill');
 
+/** The same five beats, named for whichever path the visitor took. */
+const RAILS = {
+  story:     ['Arrive', 'Fly', 'Discover', 'Respond', 'Return'],
+  discovery: ['Look', 'Flip', 'Reveal', 'Connect', 'Return'],
+};
+
 /* ================================================================
    state
    ================================================================ */
 
 const state = {
   phase: 'loading',
-  selectedPost: null,     // story chosen on the bright side
+  path: null,             // 'story' | 'discovery'
+  selectedPost: null,     // story chosen on the near side
   currentStory: null,     // story open on the far side
+  selectedSight: null,    // discovery chosen on the near side
+  currentDiscovery: null, // discovery open on the far side
   flying: false,
+  flightLines: FLIGHT_LINES,
   flightLineIndex: -1,
 };
 
@@ -51,10 +70,13 @@ sound.muted = store.isMuted();
 
 let scene;
 let feed;
+let sights;
 let farSide;
+let discover;
 let contribute;
 let closing;
 let myLights = [];
+let discovered = [];
 let signalCounter = 0;
 
 /* ================================================================
@@ -72,11 +94,20 @@ function setPhase(phase) {
 
 function setOverlay(key, open) {
   overlays[key].classList.toggle('is-active', open);
-  if (key === 'post' && scene) scene.setPhase(open ? 'post' : state.phase);
+  if ((key === 'post' || key === 'sight') && scene) {
+    scene.setPhase(open ? (key === 'post' ? 'post' : 'sight') : state.phase);
+  }
 }
 
 function anyOverlayOpen() {
   return Object.values(overlays).some((el) => el.classList.contains('is-active'));
+}
+
+function setRail(path) {
+  const labels = RAILS[path] || RAILS.story;
+  progressEl.querySelectorAll('li').forEach((li, i) => {
+    li.querySelector('span').textContent = labels[i];
+  });
 }
 
 function setProgress(step) {
@@ -138,8 +169,8 @@ function panelData(id) {
   };
 }
 
-/** Everything currently lit on the far side, in orbit order. */
-function visibleIds() {
+/** Everything currently lit on the story track, in orbit order. */
+function visibleStoryIds() {
   const all = [...STORIES.map((s) => s.id), ...myLights.map((r) => r.id)];
   if (!scene || scene.filter === 'all') return all;
   return all.filter((id) => {
@@ -148,21 +179,85 @@ function visibleIds() {
   });
 }
 
+/** Everything currently lit on the discovery track, in orbit order. */
+function visibleDiscoveryIds() {
+  if (!scene || scene.filter === 'all') return DISCOVERIES.map((d) => d.id);
+  return DISCOVERIES.filter((d) => d.category === scene.filter).map((d) => d.id);
+}
+
 /* ================================================================
-   1 · arrive
+   0 · arrive, then choose a path
    ================================================================ */
 
 function begin() {
   sound.init();
   sound.setMuted(store.isMuted());
-  sound.startBright();
-  setPhase('bright');
+  goToPaths({ fresh: true });
+}
+
+/**
+ * The hub. Reachable from anywhere, from the intro onward, and deliberately
+ * non-destructive: signals, reflections and flipped discoveries all survive.
+ */
+function goToPaths({ fresh = false } = {}) {
+  Object.keys(overlays).forEach((k) => setOverlay(k, false));
+  if (farSide) farSide.close();
+  if (discover) discover.close();
+  if (feed) feed.stopToasts();
+  if (scene) scene.resetCamera();
+
+  state.selectedPost = null;
+  state.currentStory = null;
+  state.selectedSight = null;
+  state.currentDiscovery = null;
+  state.flying = false;
+
+  if (!fresh && state.path) setProgress('closing');
+  setPhase('paths');
+  sound.fadeOutAll(fresh ? 0.4 : 1.2);
+  setTimeout(() => {
+    const card = document.querySelector(`.path-card[data-path="${state.path || 'story'}"]`);
+    if (card && state.phase === 'paths') card.focus();
+  }, 420);
+}
+
+/** Jump straight from one path's far side to the other path's near side. */
+function switchPath(path) {
+  Object.keys(overlays).forEach((k) => setOverlay(k, false));
+  farSide.close();
+  discover.close();
+  scene.resetCamera();
+  scene.setActiveLight(null);
+  state.selectedPost = null;
+  state.currentStory = null;
+  state.selectedSight = null;
+  state.currentDiscovery = null;
+  state.flying = false;
+  choosePath(path);
+}
+
+function choosePath(path) {
+  state.path = path;
+  document.body.dataset.path = path;
+  setRail(path);
   setProgress('bright');
-  feed.startToasts();
+  scene.setTrack(path);
+
+  if (path === 'story') {
+    farSide.setFilter('all');
+    sound.startBright();
+    setPhase('bright');
+    feed.startToasts();
+  } else {
+    discover.setFilter('all');
+    sights.markSeen(discovered);
+    sound.startHum();
+    setPhase('sights');
+  }
 }
 
 /* ================================================================
-   2 · choose a post, ask what is outside the frame
+   PATH ONE · Behind the Moment
    ================================================================ */
 
 function selectPost(id) {
@@ -185,55 +280,25 @@ function closePost() {
   state.selectedPost = null;
 }
 
-/* ================================================================
-   3 · fly around the Moon
-   ================================================================ */
-
 function seeOtherSide() {
   const id = state.selectedPost;
   if (!id || state.flying) return;
 
   state.flying = true;
-  state.flightLineIndex = -1;
   setOverlay('post', false);
   feed.stopToasts();
-  setPhase('flight');
-  setProgress('flight');
-  updateFlightHud(0);
-
-  sound.crossfadeToFar(prefersReducedMotion() ? 1.4 : 6);
-
-  scene
-    .flyToFarSide(id, {
-      duration: prefersReducedMotion() ? 2200 : 7400,
-      onProgress: updateFlightHud,
-    })
-    .then(() => {
-      state.flying = false;
-      enterFarSide(id);
-    });
+  startFlight(id, {
+    lines: FLIGHT_LINES,
+    mood: 'warm',
+    crossfade: () => sound.crossfadeToFar(prefersReducedMotion() ? 1.4 : 6),
+    arrive: () => enterFarSide(id),
+  });
 }
-
-function updateFlightHud(p) {
-  flightFill.style.width = `${(p * 100).toFixed(1)}%`;
-  const i = Math.min(FLIGHT_LINES.length - 1, Math.floor(p * FLIGHT_LINES.length));
-  if (i !== state.flightLineIndex) {
-    state.flightLineIndex = i;
-    flightLine.style.opacity = '0';
-    setTimeout(() => {
-      flightLine.textContent = FLIGHT_LINES[i];
-      flightLine.style.opacity = '1';
-    }, 220);
-  }
-}
-
-/* ================================================================
-   4 · discover, then respond through the relay
-   ================================================================ */
 
 function enterFarSide(focusId) {
   setPhase('far');
   setProgress('far');
+  sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
   farSide.setCount(store.signalCount());
   if (focusId) setTimeout(() => openStory(focusId, { skipFocus: true }), 500);
 }
@@ -249,7 +314,7 @@ function openStory(id, { skipFocus = false } = {}) {
 }
 
 function stepStory(delta) {
-  const ids = visibleIds();
+  const ids = visibleStoryIds();
   if (!ids.length) return;
   const at = ids.indexOf(state.currentStory);
   const next = ids[(at + delta + ids.length) % ids.length];
@@ -272,10 +337,6 @@ function sendSignal(id, text) {
       setProgress('signal');
     });
 }
-
-/* ================================================================
-   5 · contribute, then take something back
-   ================================================================ */
 
 function openContribute() {
   contribute.renderList(store.getReflections());
@@ -321,19 +382,147 @@ function openClosing() {
   if (saved) closing.choose(saved);
 }
 
+/* ================================================================
+   PATH TWO · Hidden in Plain Sight
+   ================================================================ */
+
+function selectSight(id) {
+  const d = getDiscovery(id);
+  if (!d) return;
+  state.selectedSight = id;
+
+  const host = $('sight-card');
+  host.textContent = '';
+  host.appendChild(createSightCard(d, { hero: true }));
+  $('sight-hint').textContent = CATEGORIES[d.category].blurb;
+
+  setOverlay('sight', true);
+  sound.tick();
+  setTimeout(() => $('btn-flip-moon').focus(), 320);
+}
+
+function closeSight() {
+  setOverlay('sight', false);
+  state.selectedSight = null;
+}
+
+function flipToDiscovery() {
+  const id = state.selectedSight;
+  if (!id || state.flying) return;
+
+  state.flying = true;
+  setOverlay('sight', false);
+  startFlight(id, {
+    lines: DISCOVERY_FLIGHT_LINES,
+    mood: 'cool',
+    crossfade: () => sound.crossfadeToOpen(prefersReducedMotion() ? 1.4 : 6),
+    arrive: () => enterDiscover(id),
+  });
+}
+
+function enterDiscover(focusId) {
+  setPhase('discover');
+  setProgress('far');
+  sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
+  discover.setCount(discovered.length, DISCOVERIES.length);
+  if (focusId) setTimeout(() => openDiscovery(focusId, { skipFocus: true }), 500);
+}
+
+function openDiscovery(id, { skipFocus = false } = {}) {
+  const d = getDiscovery(id);
+  if (!d) return;
+  state.currentDiscovery = id;
+  discover.show(d);
+  scene.setActiveLight(id);
+  if (!skipFocus) scene.focusLight(id);
+  sound.tick();
+}
+
+function stepDiscovery(delta) {
+  const ids = visibleDiscoveryIds();
+  if (!ids.length) return;
+  const at = ids.indexOf(state.currentDiscovery);
+  const next = ids[(at + delta + ids.length) % ids.length];
+  openDiscovery(next);
+}
+
+function markRevealed(id) {
+  discovered = store.markDiscovered(id);
+  scene.markSignalled(id);
+  discover.setCount(discovered.length, DISCOVERIES.length);
+  sights.markSeen(discovered);
+}
+
+function backToSights() {
+  discover.close();
+  state.currentDiscovery = null;
+  scene.resetCamera();
+  scene.setActiveLight(null);
+  sights.markSeen(discovered);
+  sound.startHum();
+  setPhase('sights');
+  setProgress('bright');
+}
+
+/* ================================================================
+   the flight, shared by both paths
+   ================================================================ */
+
+function startFlight(id, { lines, mood, crossfade, arrive }) {
+  state.flightLines = lines;
+  state.flightLineIndex = -1;
+  setPhase('flight');
+  setProgress('flight');
+  updateFlightHud(0);
+  crossfade();
+
+  scene
+    .flyToFarSide(id, {
+      duration: prefersReducedMotion() ? 2200 : 7400,
+      mood,
+      onProgress: updateFlightHud,
+    })
+    .then(() => {
+      state.flying = false;
+      arrive();
+    });
+}
+
+function updateFlightHud(p) {
+  const lines = state.flightLines || FLIGHT_LINES;
+  flightFill.style.width = `${(p * 100).toFixed(1)}%`;
+  const i = Math.min(lines.length - 1, Math.floor(p * lines.length));
+  if (i !== state.flightLineIndex) {
+    state.flightLineIndex = i;
+    flightLine.style.opacity = '0';
+    setTimeout(() => {
+      flightLine.textContent = lines[i];
+      flightLine.style.opacity = '1';
+    }, 220);
+  }
+}
+
+/* ================================================================
+   restart
+   ================================================================ */
+
 function restart() {
-  ['post', 'contribute', 'closing', 'notice'].forEach((k) => setOverlay(k, false));
+  Object.keys(overlays).forEach((k) => setOverlay(k, false));
   farSide.close();
   farSide.setFilter('all');
+  discover.close();
+  discover.setFilter('all');
   scene.resetCamera();
   state.selectedPost = null;
   state.currentStory = null;
+  state.selectedSight = null;
+  state.currentDiscovery = null;
   state.flying = false;
-  setPhase('bright');
-  setProgress('bright');
   $('far-hint').textContent = 'Drag to turn the Moon. Every light is a story someone did not post.';
-  sound.startBright();
-  feed.startToasts();
+  $('discover-hint').textContent = 'Drag to turn the Moon. Every light is something you already walk past.';
+
+  if (state.path) choosePath(state.path);
+  else goToPaths({ fresh: true });
 }
 
 /* ================================================================
@@ -371,8 +560,12 @@ function wireNotices() {
 }
 
 function boot() {
-  scene.onLightClick = (id) => openStory(id);
+  scene.onLightClick = (id) =>
+    (state.path === 'discovery' ? openDiscovery(id) : openStory(id));
   scene.setStories(STORIES);
+  scene.setDiscoveries(DISCOVERIES, CATEGORIES);
+
+  discovered = store.getDiscovered();
 
   feed = new Feed({
     root: $('feed'),
@@ -381,10 +574,16 @@ function boot() {
     onSelect: selectPost,
   });
 
+  sights = new Sights({
+    root: $('sights'),
+    discoveries: DISCOVERIES,
+    onSelect: selectSight,
+  });
+
   farSide = new FarSide({
     onFilter: (theme) => {
       scene.setFilter(theme);
-      const ids = visibleIds();
+      const ids = visibleStoryIds();
       const label = (THEMES[theme]?.label || '').toLowerCase();
       $('far-hint').textContent = ids.length
         ? `${ids.length} ${theme === 'all' ? 'stories' : `${label} stories`} lit. Drag to turn the Moon.`
@@ -399,22 +598,55 @@ function boot() {
     },
   });
 
+  discover = new Discover({
+    scene,
+    sound,
+    onFilter: (key) => {
+      scene.setFilter(key);
+      const ids = visibleDiscoveryIds();
+      const label = (CATEGORIES[key]?.short || '').toLowerCase();
+      $('discover-hint').textContent = ids.length
+        ? `${ids.length} ${key === 'all' ? 'discoveries' : `“${label}” discoveries`} lit. Drag to turn the Moon.`
+        : 'Nothing lit under that question yet.';
+      if (state.currentDiscovery && !ids.includes(state.currentDiscovery)) discover.close();
+    },
+    onStep: stepDiscovery,
+    onRevealed: markRevealed,
+    onConnect: () => setProgress('signal'),
+    onClose: () => {
+      state.currentDiscovery = null;
+      scene.setActiveLight(null);
+    },
+  });
+
   contribute = new Contribute({ onSave: saveReflection, onDelete: deleteReflection });
   closing = new Closing({
     onChoose: (id) => { store.setChosenAction(id); sound.tick(); },
   });
 
   $('btn-begin').addEventListener('click', begin);
+  document.querySelectorAll('.path-card').forEach((card) =>
+    card.addEventListener('click', () => choosePath(card.dataset.path)));
+
   $('btn-see-other-side').addEventListener('click', seeOtherSide);
+  // from a sample post straight into writing your own, without the detour
+  // through the far side
+  $('btn-write-own').addEventListener('click', () => { closePost(); openContribute(); });
+  $('btn-flip-moon').addEventListener('click', flipToDiscovery);
   $('btn-skip').addEventListener('click', () => scene.skipFlight());
   $('btn-contribute').addEventListener('click', openContribute);
   $('btn-return').addEventListener('click', openClosing);
   $('btn-back-to-far').addEventListener('click', () => setOverlay('closing', false));
+  $('btn-back-to-sights').addEventListener('click', backToSights);
+  $('btn-other-path').addEventListener('click', () => switchPath('story'));
+  $('btn-try-other').addEventListener('click', () => switchPath('discovery'));
+  $('btn-paths').addEventListener('click', () => goToPaths());
   $('btn-restart').addEventListener('click', restart);
-  $('btn-restart-2').addEventListener('click', restart);
 
   document.querySelectorAll('[data-close-post]').forEach((b) =>
     b.addEventListener('click', closePost));
+  document.querySelectorAll('[data-close-sight]').forEach((b) =>
+    b.addEventListener('click', closeSight));
   document.querySelectorAll('[data-close-contribute]').forEach((b) =>
     b.addEventListener('click', () => setOverlay('contribute', false)));
 
@@ -424,7 +656,9 @@ function boot() {
       if (overlays.contribute.classList.contains('is-active')) setOverlay('contribute', false);
       else if (overlays.closing.classList.contains('is-active')) setOverlay('closing', false);
       else if (overlays.post.classList.contains('is-active')) closePost();
+      else if (overlays.sight.classList.contains('is-active')) closeSight();
       else if (farSide.isOpen) farSide.close();
+      else if (discover.isOpen) discover.close();
       return;
     }
     if (state.phase === 'flight' && (e.key === 'Enter' || e.key === ' ') && !anyOverlayOpen()) {
@@ -447,7 +681,7 @@ function boot() {
   window.addEventListener('pointerdown', () => sound.resume(), { once: true });
 
   // a small handle for judges and debugging
-  window.FarSide = { scene, sound, store, restart, state };
+  window.Moonflip = { scene, sound, store, restart, goToPaths, choosePath, state };
 }
 
 wireSoundToggle();
@@ -458,7 +692,7 @@ try {
   boot();
 } catch (err) {
   // no WebGL (or a GPU the browser will not use): say so instead of dying silently
-  console.error('The Far Side could not start the 3D scene:', err);
+  console.error('Moonflip could not start the 3D scene:', err);
   $('scene').hidden = true;
   setPhase('unsupported');
 }

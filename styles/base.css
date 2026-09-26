@@ -1,5 +1,5 @@
 /* ============================================================
-   The Far Side — base layer: tokens, reset, stage, typography
+   Moonflip — base layer: tokens, reset, stage, typography
    ============================================================ */
 
 :root {
@@ -27,6 +27,12 @@
   --t-uncertainty: #ffd98a;
   --t-mine:        #fff4d6;
 
+  /* the discoveries path reads clear and awake rather than warm */
+  --c-mechanism:   #5fe0cf;
+  --c-enablers:    #b9a6ff;
+  --clear:         #7fe4dc;
+  --clear-glow:    rgba(127, 228, 220, 0.3);
+
   --glass:       rgba(12, 15, 28, 0.72);
   --glass-line:  rgba(244, 241, 234, 0.14);
 
@@ -35,6 +41,9 @@
 
   --font-body:   "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display:"Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  /* homepage only: the wordmark and its note */
+  --font-brand:  "Cinzel", ui-serif, Georgia, "Times New Roman", serif;
+  --font-note:   "Jost", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --ease:        cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-soft:   cubic-bezier(0.4, 0, 0.2, 1);
@@ -77,6 +86,7 @@ body {
 }
 body[data-dragging="true"] #scene { cursor: grabbing; }
 body[data-phase="loading"] #scene,
+body[data-phase="paths"] #scene,
 body[data-phase="intro"] #scene { cursor: default; }
 
 #vignette {
@@ -243,6 +253,9 @@ body:not([data-phase="loading"]):not([data-phase="intro"]):not([data-phase="unsu
 body[data-phase="unsupported"] .chrome { opacity: 0; pointer-events: none; }
 .chrome > * { pointer-events: auto; }
 
+/* "Paths" is the way back to the hub — no use while you are standing in it */
+body[data-phase="paths"] #btn-paths { display: none; }
+
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand__moon {
   width: 22px; height: 22px;
@@ -313,8 +326,15 @@ body[data-phase="unsupported"] .chrome { opacity: 0; pointer-events: none; }
 }
 body[data-phase="bright"] .progress,
 body[data-phase="post"] .progress,
+body[data-phase="sights"] .progress,
+body[data-phase="sight"] .progress,
 body[data-phase="flight"] .progress,
+body[data-phase="discover"] .progress,
 body[data-phase="far"] .progress { opacity: 1; }
+
+/* the rail takes the colour of the path you are on */
+body[data-path="discovery"] .progress li.is-current { color: var(--clear); }
+body[data-path="discovery"] .progress li.is-current::before { box-shadow: 0 0 12px 2px var(--clear-glow); }
 
 .progress li {
   display: flex;

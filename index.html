@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>The Far Side — Beyond the Highlight</title>
-<meta name="description" content="An interactive Moon experience about the feelings behind polished social media moments. Travel from the highlight side of the Moon to its far side, read anonymous two-sided stories, and send a quiet signal of support." />
+<title>Moonflip — Flip the Moon. See what you missed.</title>
+<meta name="description" content="An interactive Moon that asks what else is happening here. Fly around it to find the feelings behind a shared moment, or the mechanism and the people behind something ordinary." />
 <meta name="theme-color" content="#05060d" />
 
-<meta property="og:title" content="The Far Side — Beyond the Highlight" />
-<meta property="og:description" content="Every highlight has a story outside the frame." />
+<meta property="og:title" content="Moonflip — Flip the Moon. See what you missed." />
+<meta property="og:description" content="The side facing us is what we notice first. Fly around it and there is always another half. Two paths: human stories, and everyday discoveries." />
 <meta property="og:type" content="website" />
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23e8e2d6'/%3E%3Ccircle cx='22' cy='13' r='11' fill='%23070912'/%3E%3C/svg%3E" />
@@ -16,10 +16,11 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=Cinzel:wght@400;500;600&family=Jost:wght@300;400&display=swap" />
 
 <link rel="stylesheet" href="./styles/base.css" />
 <link rel="stylesheet" href="./styles/ui.css" />
+<link rel="stylesheet" href="./styles/discover.css" />
 
 <script type="importmap">
 {
@@ -30,13 +31,13 @@
 </script>
 </head>
 
-<body data-phase="loading">
+<body data-phase="loading" data-path="none">
 
   <!-- ============ 3D layer ============ -->
   <canvas id="scene" aria-hidden="true"></canvas>
   <div id="vignette" aria-hidden="true"></div>
 
-  <!-- Far-side story lights, projected from 3D to screen space -->
+  <!-- Far-side lights, projected from 3D to screen space -->
   <div id="markers" class="markers" aria-hidden="true"></div>
 
   <!-- ============ Persistent chrome ============ -->
@@ -44,12 +45,16 @@
     <div class="brand">
       <span class="brand__moon" aria-hidden="true"></span>
       <span class="brand__text">
-        <strong>The Far Side</strong>
-        <em>Beyond the Highlight</em>
+        <strong>Moonflip</strong>
+        <em>Flip the Moon</em>
       </span>
     </div>
 
     <nav class="chrome__controls">
+      <button id="btn-paths" class="icon-btn" type="button" title="Back to the two paths">
+        <span class="icon-btn__glyph">◑</span>
+        <span class="icon-btn__label">Paths</span>
+      </button>
       <button id="btn-mute" class="icon-btn" type="button" aria-pressed="false" title="Mute sound">
         <span class="icon-btn__glyph" data-on="♪" data-off="✕">♪</span>
         <span class="icon-btn__label">Sound</span>
@@ -83,32 +88,83 @@
     <!-- 1. Intro -------------------------------------------------- -->
     <section class="screen screen--center" id="screen-intro" aria-labelledby="intro-title">
       <div class="panel panel--intro">
-        <p class="eyebrow">An interactive Moon experience</p>
-        <h1 id="intro-title" class="display">The Far Side</h1>
-        <p class="tagline">Every highlight has a story outside the frame.</p>
-        <p class="lede">
-          Social media shows us outcomes: the acceptance, the celebration, the smiling
-          group photo. It rarely shows the rejection, the homesickness, the pressure
-          standing just outside the frame.
-        </p>
-        <p class="lede lede--quiet">
-          Both sides can be true at once. Someone can be proud of an achievement and
-          still feel lonely, exhausted, or uncertain.
-        </p>
+        <h1 id="intro-title" class="brandmark" aria-label="MoonFlip">M<span
+          class="title-small" aria-hidden="true">oon</span>F<span
+          class="title-small" aria-hidden="true">lip</span></h1>
+        <p class="tagline">Flip the Moon. See what you missed.</p>
         <button id="btn-begin" class="btn btn--primary btn--lg" type="button">
           Fly me to the Moon
         </button>
         <p class="fineprint">
-          The stories on the far side are <strong>clearly labelled samples</strong>,
-          written for this demo. Anything you write stays in your own browser.
-          <a href="#notice-safety" data-open-notice="safety">Support resources →</a>
+          Human stories here are <strong>clearly labelled samples</strong> written for this
+          project. Discoveries link to their sources. Anything you write stays in your own
+          browser. <a href="#notice-safety" data-open-notice="safety">Support resources →</a>
         </p>
       </div>
     </section>
 
-    <!-- 2. Bright side -------------------------------------------- -->
+    <!-- 2. Choose a path ------------------------------------------ -->
+    <section class="screen screen--center" id="screen-paths" aria-labelledby="paths-title">
+      <div class="paths">
+        <div class="paths__head">
+          <p class="eyebrow">Two ways around</p>
+          <h2 id="paths-title" class="display display--sm">What else is happening here?</h2>
+          <p class="lede lede--tight">
+            Same Moon, same flight. Pick what you want to find on the other side.
+          </p>
+        </div>
+
+        <div class="paths__grid" role="group" aria-label="Choose a path">
+          <button class="path-card path-card--story" type="button" data-path="story">
+            <span class="path-card__constellation" aria-hidden="true">
+              <svg viewBox="0 0 120 80" focusable="false">
+                <polyline points="14,58 34,40 58,52 82,26 106,34" />
+                <circle cx="14" cy="58" r="3.2" /><circle cx="34" cy="40" r="4.4" />
+                <circle cx="58" cy="52" r="3" /><circle cx="82" cy="26" r="4.8" />
+                <circle cx="106" cy="34" r="3.4" />
+              </svg>
+            </span>
+            <span class="path-card__eyebrow">Path one · empathy</span>
+            <span class="path-card__title">Behind the Moment</span>
+            <span class="path-card__desc">
+              A visible achievement or a happy photo, and the context the person chose to
+              share about it. Read what was standing outside the frame, then send a quiet
+              moonbeam back.
+            </span>
+            <span class="path-card__go">Take this path →</span>
+          </button>
+
+          <button class="path-card path-card--discover" type="button" data-path="discovery">
+            <span class="path-card__constellation" aria-hidden="true">
+              <svg viewBox="0 0 120 80" focusable="false">
+                <polyline points="18,30 44,20 60,46 88,38 100,60" />
+                <polyline points="44,20 60,46 34,62" />
+                <circle cx="18" cy="30" r="3.2" /><circle cx="44" cy="20" r="4.6" />
+                <circle cx="60" cy="46" r="3.4" /><circle cx="88" cy="38" r="4.2" />
+                <circle cx="100" cy="60" r="3" /><circle cx="34" cy="62" r="3.6" />
+              </svg>
+            </span>
+            <span class="path-card__eyebrow">Path two · curiosity</span>
+            <span class="path-card__title">Hidden in Plain Sight</span>
+            <span class="path-card__desc">
+              Something familiar, flipped. Either <em>how does it work?</em> — the mechanism
+              inside the ordinary thing — or <em>what makes it possible?</em> — the people,
+              places and systems behind the convenience.
+            </span>
+            <span class="path-card__go">Take this path →</span>
+          </button>
+        </div>
+
+        <p class="paths__note">
+          You can switch at any point — <strong>Paths</strong> in the top corner brings you
+          back here without losing anything.
+        </p>
+      </div>
+    </section>
+
+    <!-- 3. Bright side: the feed (path one) ----------------------- -->
     <section class="screen screen--bright" id="screen-bright" aria-labelledby="bright-title">
-      <h2 id="bright-title" class="sr-only">The highlight side of the Moon</h2>
+      <h2 id="bright-title" class="sr-only">The side of the Moon that faces us: shared moments</h2>
       <div id="feed" class="feed"></div>
       <div id="toasts" class="toasts" aria-hidden="true"></div>
       <p class="hint hint--bottom">
@@ -117,7 +173,7 @@
       </p>
     </section>
 
-    <!-- 3. Selected post sheet ------------------------------------ -->
+    <!-- 4. Selected post sheet ------------------------------------ -->
     <section class="screen screen--center screen--scrim" id="screen-post" aria-labelledby="post-title">
       <div class="panel panel--post">
         <button class="panel__close" type="button" data-close-post aria-label="Back to the feed">×</button>
@@ -129,14 +185,46 @@
         </div>
         <div class="row">
           <button id="btn-see-other-side" class="btn btn--primary" type="button">
-            See the other side
+            Flip the Moon
+          </button>
+          <button id="btn-write-own" class="btn btn--secondary" type="button">
+            Create your own post
           </button>
           <button class="btn btn--ghost" type="button" data-close-post>Back to the feed</button>
         </div>
       </div>
     </section>
 
-    <!-- 4. Flight ------------------------------------------------- -->
+    <!-- 5. Near side: everyday sights (path two) ------------------ -->
+    <section class="screen screen--bright" id="screen-sights" aria-labelledby="sights-title">
+      <h2 id="sights-title" class="sr-only">The side of the Moon that faces us: familiar things</h2>
+      <div id="sights" class="feed"></div>
+      <p class="hint hint--bottom">
+        <span class="hint__pulse" aria-hidden="true"></span>
+        Pick something ordinary. Ask what else is going on inside it.
+      </p>
+    </section>
+
+    <!-- 6. Selected sight sheet ----------------------------------- -->
+    <section class="screen screen--center screen--scrim" id="screen-sight" aria-labelledby="sight-title">
+      <div class="panel panel--post">
+        <button class="panel__close" type="button" data-close-sight aria-label="Back to the sights">×</button>
+        <h2 id="sight-title" class="sr-only">Selected sight</h2>
+        <div id="sight-card"></div>
+        <div class="post-question post-question--cool">
+          <p class="post-question__q">What else is happening here?</p>
+          <p class="post-question__hint" id="sight-hint"></p>
+        </div>
+        <div class="row">
+          <button id="btn-flip-moon" class="btn btn--primary" type="button">
+            Flip the Moon
+          </button>
+          <button class="btn btn--ghost" type="button" data-close-sight>Back to the sights</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Flight (shared) ---------------------------------------- -->
     <section class="screen screen--flight" id="screen-flight" aria-live="polite">
       <div class="flight">
         <p id="flight-line" class="flight__line"></p>
@@ -147,7 +235,7 @@
       </div>
     </section>
 
-    <!-- 5. Far side ----------------------------------------------- -->
+    <!-- 8. Far side: stories (path one) --------------------------- -->
     <section class="screen screen--far" id="screen-far">
       <div class="far-top">
         <div class="filters" role="group" aria-label="Filter stories by experience">
@@ -189,7 +277,54 @@
       </div>
     </section>
 
-    <!-- 6. Contribute --------------------------------------------- -->
+    <!-- 9. Far side: discoveries (path two) ----------------------- -->
+    <section class="screen screen--far" id="screen-discover">
+      <div class="far-top">
+        <div class="filters" role="group" aria-label="Filter discoveries by kind">
+          <span class="filters__label">Explore by question</span>
+          <div id="discovery-filters" class="filters__chips"></div>
+        </div>
+      </div>
+
+      <!-- not a live region: the widgets inside mutate constantly, so the panel
+           takes focus when it opens instead, and only the widgets' own small
+           readouts announce themselves -->
+      <aside id="discovery-panel" class="story-panel story-panel--cool"
+             role="region" tabindex="-1" aria-labelledby="discovery-heading">
+        <button class="panel__close" type="button" data-close-discovery aria-label="Close discovery">×</button>
+        <span id="discovery-category" class="chip chip--theme"></span>
+        <p class="story-panel__seen-label">What it looks like</p>
+        <blockquote id="discovery-front" class="story-panel__seen"></blockquote>
+        <h3 id="discovery-heading" class="story-panel__label">What else is happening</h3>
+        <p id="discovery-headline" class="story-panel__text"></p>
+        <p id="discovery-lead" class="story-panel__note"></p>
+
+        <div id="discovery-widget" class="discovery__widget"></div>
+
+        <div id="discovery-explain" class="discovery__explain"></div>
+        <p id="discovery-caveat" class="discovery__caveat"></p>
+        <div id="discovery-connections" class="connections"></div>
+        <p id="discovery-source" class="discovery__source"></p>
+
+        <div class="story-panel__nav">
+          <button class="btn btn--ghost btn--sm" type="button" data-discovery-step="-1">‹ Previous</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-discovery-step="1">Next ›</button>
+        </div>
+      </aside>
+
+      <div class="far-bottom">
+        <p class="far-hint" id="discover-hint">
+          Drag to turn the Moon. Every light is something you already walk past.
+        </p>
+        <div class="row row--center">
+          <button id="btn-back-to-sights" class="btn btn--primary" type="button">Back to the near side</button>
+          <button id="btn-other-path" class="btn btn--ghost" type="button">Try the other path</button>
+        </div>
+        <p class="constellation-count" id="discovery-count"></p>
+      </div>
+    </section>
+
+    <!-- 10. Contribute (path one) --------------------------------- -->
     <section class="screen screen--center screen--scrim" id="screen-contribute" aria-labelledby="contribute-title">
       <div class="panel panel--wide">
         <button class="panel__close" type="button" data-close-contribute aria-label="Close">×</button>
@@ -238,7 +373,7 @@
       </div>
     </section>
 
-    <!-- 7. Return to Earth ---------------------------------------- -->
+    <!-- 11. Return to Earth (path one) ---------------------------- -->
     <section class="screen screen--center screen--scrim" id="screen-closing" aria-labelledby="closing-title">
       <div class="panel panel--wide">
         <p class="eyebrow">Before you go back</p>
@@ -264,7 +399,7 @@
 
         <div class="row">
           <button id="btn-back-to-far" class="btn btn--ghost" type="button">Back to the far side</button>
-          <button id="btn-restart-2" class="btn btn--ghost" type="button">Start again</button>
+          <button id="btn-try-other" class="btn btn--ghost" type="button">Try the other path</button>
         </div>
         <p class="fineprint">
           <a href="#notice-safety" data-open-notice="safety">If you are struggling right now →</a>
@@ -279,7 +414,7 @@
         <p class="eyebrow">A note on care</p>
         <h2 id="safety-title" class="display display--sm">This is an art piece, not a crisis service</h2>
         <p class="lede lede--tight">
-          The Far Side cannot reply to you, and nobody is monitoring what you write here.
+          Moonflip cannot reply to you, and nobody is monitoring what you write here.
           If you are in distress or thinking about harming yourself, please talk to a real
           person tonight.
         </p>
@@ -301,16 +436,17 @@
         <p class="eyebrow">The Moon could not launch</p>
         <h2 id="unsupported-title" class="display display--sm">This browser has no WebGL</h2>
         <p class="lede lede--tight">
-          The Far Side draws a real Moon, so it needs hardware-accelerated
-          graphics. Try Chrome, Edge, Safari 16+ or Firefox with hardware
-          acceleration switched on — or open it on a phone.
+          Moonflip draws a real Moon, so it needs hardware-accelerated graphics. Try
+          Chrome, Edge, Safari 16+ or Firefox with hardware acceleration switched on —
+          or open it on a phone.
         </p>
         <p class="lede lede--quiet">
-          The idea survives without the Moon, though: the post you saw is not the
-          whole story, and asking someone how they actually are costs nothing.
+          The idea survives without the Moon, though. Whatever you are looking at —
+          a person's good news, a QR code, a photo disappearing into "the cloud" —
+          there is a whole other half of it pointed away from you.
         </p>
         <figure class="closing-line">
-          <blockquote>You never see someone's whole sky from one angle.</blockquote>
+          <blockquote>Flip the Moon. See what you missed.</blockquote>
         </figure>
         <p class="fineprint">
           <a href="#notice-safety" data-open-notice="safety">Support resources →</a>
@@ -322,7 +458,7 @@
 
   <noscript>
     <div class="noscript">
-      <h1>The Far Side</h1>
+      <h1>Moonflip</h1>
       <p>This experience is built with WebGL and needs JavaScript enabled.</p>
     </div>
   </noscript>

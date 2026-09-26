@@ -3,12 +3,15 @@
  * There is no server in this project — on purpose.
  */
 
+// The prefix predates the Moonflip name; it stays so nobody loses what they
+// already wrote in this browser.
 const PREFIX = 'farside.v1.';
 const KEYS = {
   reflections: `${PREFIX}reflections`,
   signals: `${PREFIX}signals`,
   muted: `${PREFIX}muted`,
   action: `${PREFIX}action`,
+  discovered: `${PREFIX}discovered`,
 };
 
 function read(key, fallback) {
@@ -73,6 +76,22 @@ export function addSignal(storyId, text) {
 
 export function signalCount() {
   return Object.values(getSignals()).reduce((n, list) => n + list.length, 0);
+}
+
+/* ---------- discoveries already flipped ---------- */
+
+export function getDiscovered() {
+  const list = read(KEYS.discovered, []);
+  return Array.isArray(list) ? list : [];
+}
+
+export function markDiscovered(id) {
+  const list = getDiscovered();
+  if (!list.includes(id)) {
+    list.push(id);
+    write(KEYS.discovered, list);
+  }
+  return list;
 }
 
 /* ---------- small preferences ---------- */
