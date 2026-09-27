@@ -765,6 +765,9 @@ function boot() {
     card.addEventListener('click', () => choosePath(card.dataset.path)));
 
   $('btn-see-other-side').addEventListener('click', seeOtherSide);
+  // from a sample post straight into writing your own, without the detour
+  // through the far side
+  $('btn-write-own').addEventListener('click', () => { closePost(); openContribute(); });
   $('btn-flip-moon').addEventListener('click', flipToDiscovery);
   $('btn-skip').addEventListener('click', () => scene.skipFlight());
   $('btn-contribute').addEventListener('click', openContribute);
