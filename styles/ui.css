@@ -911,3 +911,145 @@
   color: var(--ink-soft);
 }
 .resources strong { color: var(--ink); font-weight: 500; }
+
+/* ============================================================
+   My constellation — the private view
+   ============================================================ */
+
+.glass-panel {
+  position: absolute;
+  top: 50%;
+  right: clamp(14px, 3vw, 34px);
+  transform: translate(26px, -50%);
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(74vh, 700px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 24px 22px;
+  background: linear-gradient(168deg, rgba(30, 24, 17, 0.62), rgba(12, 11, 18, 0.72));
+  border: 1px solid rgba(255, 184, 119, 0.28);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 0 80px -30px var(--warm-glow);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease), visibility 0.6s step-end;
+}
+.glass-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(0, -50%);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease), visibility 0s;
+}
+.glass-panel__title {
+  margin: 0.2em 0 0.8em;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+.glass-panel__empty {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+/* ---------- the streak moon ---------- */
+
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--warm);
+}
+.streak__moon { flex: none; }
+.streak__moon-dark { fill: rgba(244, 241, 234, 0.13); }
+.streak__moon-lit  { fill: #ffe6c2; }
+
+/* ---------- earned keepsakes ---------- */
+
+.keepsakes { margin: 0; padding: 0; list-style: none; }
+.keepsake {
+  display: flex;
+  gap: 11px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.keepsake:last-child { border-bottom: 0; }
+.keepsake__mark {
+  flex: none;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--c, var(--warm));
+  text-shadow: 0 0 12px var(--c, var(--warm-glow));
+}
+.keepsake__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.keepsake__body strong {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.keepsake__body em {
+  font-style: normal;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+/* ---------- the card ---------- */
+
+#btn-make-card { margin-top: 18px; }
+
+.card {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.card__toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.card__toggle input { accent-color: var(--warm); width: 15px; height: 15px; }
+.card-slot { display: block; }
+.card-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-line);
+}
+.card__note {
+  margin: 12px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+
+/* a light that is not part of your own sky, while the private view is on */
+.marker.is-muted { opacity: 0.1 !important; pointer-events: none; }
+
+@media (max-width: 860px) {
+  .glass-panel {
+    top: auto;
+    bottom: 0;
+    right: 0; left: 0;
+    width: 100%;
+    max-height: 72vh;
+    transform: translateY(24px);
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .glass-panel.is-open { transform: none; }
+}

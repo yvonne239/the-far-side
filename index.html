@@ -186,12 +186,51 @@
         </div>
       </aside>
 
+      <!-- the private view of what this visitor has given -->
+      <aside id="constellation-panel" class="glass-panel" role="region"
+             tabindex="-1" aria-labelledby="constellation-title">
+        <button class="panel__close" type="button" data-close-constellation
+                aria-label="Close">×</button>
+        <p class="eyebrow">Yours only</p>
+        <h3 id="constellation-title" class="glass-panel__title">My constellation</h3>
+
+        <p id="constellation-streak" class="streak" hidden></p>
+
+        <p id="constellation-empty" class="glass-panel__empty" hidden>
+          Send a signal to a story to begin your sky.
+        </p>
+
+        <ul id="constellation-list" class="keepsakes"></ul>
+
+        <button id="btn-make-card" class="btn btn--secondary btn--sm" type="button">
+          Create my card
+        </button>
+
+        <div id="constellation-card" class="card" hidden>
+          <label class="card__toggle">
+            <input type="checkbox" id="card-show-count" />
+            <span>Show how many</span>
+          </label>
+          <div class="card-slot"></div>
+          <div id="card-actions" class="row" hidden>
+            <button id="btn-card-download" class="btn btn--primary btn--sm" type="button">Download</button>
+            <button id="btn-card-share" class="btn btn--ghost btn--sm" type="button" hidden>Share</button>
+          </div>
+          <p class="card__note">
+            The card shows only the shape of your sky — never anything you or
+            anyone else wrote.
+          </p>
+        </div>
+      </aside>
+
       <div class="far-bottom">
         <p class="far-hint" id="far-hint">
           Drag to turn the Moon. Every light is a story someone did not post.
         </p>
         <div class="row row--center">
           <button id="btn-contribute" class="btn btn--primary" type="button">Add your two sides</button>
+          <button id="btn-constellation" class="btn btn--secondary" type="button"
+                  aria-pressed="false">My constellation</button>
           <button id="btn-return" class="btn btn--ghost" type="button">Return to Earth</button>
         </div>
         <p class="constellation-count" id="constellation-count"></p>

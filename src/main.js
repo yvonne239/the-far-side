@@ -4,9 +4,13 @@ import { Feed, createPostCard } from './ui/feed.js';
 import { FarSide } from './ui/farside.js';
 import { Contribute } from './ui/contribute.js';
 import { Closing } from './ui/closing.js';
+import { Constellation } from './ui/constellation.js';
 import { STORIES, THEMES, FLIGHT_LINES, getStory } from './data/stories.js';
 import * as store from './lib/storage.js';
 import { mulberry32, prefersReducedMotion } from './lib/util.js';
+import {
+  earned, newlyEarned, recordGivingDay, sentToday, localDay,
+} from './lib/progress.js';
 
 /* ================================================================
    elements
@@ -69,6 +73,7 @@ let farSide;
 let contribute;
 let closing;
 let myLights = [];
+let constellation;
 let signalCounter = 0;
 
 /* ================================================================
@@ -149,6 +154,89 @@ const arrival = {
 
 /** Shown when a light of the visitor's own lands on the far side. */
 const LIGHT_LANDED = 'Your light has joined the dark side.';
+
+/**
+ * Milestone lines wait their turn rather than talking over each other, and
+ * each one is spoken once. Nothing here ever nags: there is no reminder, and
+ * a broken streak is only ever met with "The moon waited for you."
+ */
+const whisper = {
+  queue: [],
+  busy: false,
+  say(line) {
+    this.queue.push(line);
+    this._next();
+  },
+  _next() {
+    if (this.busy || !this.queue.length) return;
+    this.busy = true;
+    const line = this.queue.shift();
+    arrival.flash(line, prefersReducedMotion() ? 1600 : 4200);
+    setTimeout(() => {
+      this.busy = false;
+      this._next();
+    }, prefersReducedMotion() ? 1900 : 4700);
+  },
+};
+
+/* ================================================================
+   the sky the visitor builds: stardust, crystals, nights in a row
+   ================================================================ */
+
+/** Puts every earned keepsake into the scene. Safe to call repeatedly. */
+function placeKeepsakes(list) {
+  list.forEach((m, i) => {
+    if (m.kind === 'crystal') {
+      scene.addCrystal(m.id, THEMES[m.theme]?.color || '#ffc98f', i);
+    } else {
+      scene.addStardust(m.id, i);
+    }
+  });
+}
+
+/**
+ * Works out what is newly earned, remembers it, shows it, and puts it in the
+ * sky. Called after a signal lands and once on arrival at the far side.
+ *
+ * @param {boolean} announce false while restoring a saved sky, so old
+ *   milestones do not all shout at once on page load
+ */
+function syncKeepsakes({ announce = true } = {}) {
+  const log = store.getSignalLog();
+  const all = earned(log, store.getStreak());
+  const fresh = newlyEarned(all, store.getUnlocked());
+
+  placeKeepsakes(all);
+  fresh.forEach((m) => {
+    store.unlock(m.id);
+    if (announce) whisper.say(m.line);
+  });
+  if (constellation && constellation.open) constellation.render();
+  return fresh;
+}
+
+/** The data the private panel and the card are drawn from. */
+function constellationData() {
+  const log = store.getSignalLog();
+  const unlocked = earned(log, store.getStreak())
+    .filter((m) => store.getUnlocked().includes(m.id));
+
+  // unit-sphere x/y is already an orthographic view of the far side
+  const points = [];
+  store.signalledIds().forEach((id) => {
+    const light = scene.lights.get(id);
+    if (!light) return;
+    points.push({
+      x: light.dir.x, y: light.dir.y, kind: 'light',
+      color: THEMES[light.theme]?.color || '#ffc98f',
+    });
+  });
+  scene.stardust.forEach(({ dir }) => {
+    if (dir) points.push({ x: dir.x, y: dir.y, kind: 'dust', color: '#fff2d4' });
+  });
+
+  return { log, unlocked, streak: store.getStreak(), points, todayCount: sentToday(log) };
+}
 
 /**
  * The panel opens once the caption has finished moving, not during, so the
@@ -317,8 +405,30 @@ function enterFarSide(focusId, { landed = false } = {}) {
   if (landed) arrival.flash(LIGHT_LANDED);
   else arrival.play();
   farSide.setCount(store.signalCount());
+  restoreSky();
   const delay = landed ? 900 : arrivalPanelDelay();
   if (focusId) setTimeout(() => openStory(focusId, { skipFocus: true }), delay);
+}
+
+/**
+ * Draws the saved sky the first time the far side is reached in a session:
+ * the strands, then every keepsake already earned. Silent — these were
+ * celebrated when they happened.
+ */
+let skyRestored = false;
+function restoreSky() {
+  if (skyRestored) return;
+  skyRestored = true;
+  const log = store.getSignalLog();
+  const seen = new Set();
+  const order = [];
+  log.forEach((s) => {
+    if (seen.has(s.id)) return;
+    seen.add(s.id);
+    order.push({ id: s.id, theme: s.theme });
+  });
+  scene.restoreConstellation(order);
+  syncKeepsakes({ announce: false });
 }
 
 function openStory(id, { skipFocus = false } = {}) {
@@ -342,17 +452,26 @@ function stepStory(delta) {
 function sendSignal(id, text) {
   farSide.setSignalsEnabled(false);
   farSide.setStatus(`Relaying “${text}” through the satellite…`);
+  const theme = (panelData(id) || {}).theme || null;
 
   scene
     .sendSignal(id, { onArrive: () => sound.chime(signalCounter++) })
     .then(() => {
-      store.addSignal(id, text);
+      store.addSignal(id, text, theme);
       scene.markSignalled(id);
       farSide.setCount(store.signalCount());
       farSide.setStatus('Delivered. No counter, no ranking — just one light knowing someone stopped.');
       const data = panelData(id);
       farSide.setSignalsEnabled(!(data && data.mine));
       setProgress('signal');
+
+      // only sending a signal counts towards the moon; writing does not
+      const next = recordGivingDay(store.getStreak(), localDay());
+      if (next.counted) {
+        store.setStreak({ days: next.days, lastDay: next.lastDay });
+        if (next.returned) whisper.say('The moon waited for you.');
+      }
+      syncKeepsakes();
     });
 }
 
@@ -407,6 +526,14 @@ function deleteReflection(id) {
   contribute.renderList(myLights);
   if (state.currentStory === id) farSide.close();
   if (state.selectedPost === id) closePost();
+}
+
+function toggleConstellation() {
+  constellation.toggle();
+}
+
+function closeConstellation() {
+  if (constellation && constellation.open) constellation.close();
 }
 
 function openClosing() {
@@ -469,6 +596,8 @@ function restart() {
   state.currentStory = null;
   state.flying = false;
   $('far-hint').textContent = 'Drag to turn the Moon. Every light is a story someone did not post.';
+  closeConstellation();
+  skyRestored = false;
   startJourney();
 }
 
@@ -536,6 +665,15 @@ function boot() {
     },
   });
 
+  constellation = new Constellation({
+    read: constellationData,
+    onToggle: (on) => {
+      scene.setPrivateView(on);
+      $('btn-constellation').setAttribute('aria-pressed', String(on));
+      if (on) farSide.close();
+    },
+  });
+
   contribute = new Contribute({ onSave: saveReflection, onDelete: deleteReflection });
   closing = new Closing({
     onChoose: (id) => { store.setChosenAction(id); sound.tick(); },
@@ -548,6 +686,7 @@ function boot() {
   $('btn-write-own').addEventListener('click', () => { closePost(); openContribute(); });
   $('btn-skip').addEventListener('click', () => scene.skipFlight());
   $('btn-contribute').addEventListener('click', openContribute);
+  $('btn-constellation').addEventListener('click', toggleConstellation);
   $('btn-contribute-near').addEventListener('click', openContribute);
   $('btn-return').addEventListener('click', openClosing);
   $('btn-back-to-far').addEventListener('click', () => setOverlay('closing', false));
@@ -565,6 +704,7 @@ function boot() {
       if (overlays.contribute.classList.contains('is-active')) setOverlay('contribute', false);
       else if (overlays.closing.classList.contains('is-active')) setOverlay('closing', false);
       else if (overlays.post.classList.contains('is-active')) closePost();
+      else if (constellation.open) closeConstellation();
       else if (farSide.isOpen) farSide.close();
       return;
     }
@@ -588,7 +728,7 @@ function boot() {
   window.addEventListener('pointerdown', () => sound.resume(), { once: true });
 
   // a small handle for judges and debugging
-  window.Moonflip = { scene, sound, store, restart, state };
+  window.Moonflip = { scene, sound, store, restart, state, constellation };
 }
 
 wireSoundToggle();

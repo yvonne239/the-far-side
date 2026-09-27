@@ -35,6 +35,9 @@ export class MoonScene {
     this.phase = 'intro';
     this.filter = 'all';
     this.signalled = [];
+    this.stardust = new Map();
+    this.crystals = new Map();
+    this.privateView = false;
     this.viewerAnchor = null;
     this.clock = new THREE.Clock();
     this._raf = null;
@@ -622,6 +625,8 @@ export class MoonScene {
    * record of people noticing each other, and restarting should not erase it.
    */
   resetCamera() {
+    this.privateView = false;
+    this.stars.material.opacity = 0.85;
     this.tweens.length = 0;
     this.flight = null;
     this.cam = { angle: 0, radius: 3.35, elev: 0.1, spin: 0.028 };
@@ -720,11 +725,12 @@ export class MoonScene {
           geo.dispose();
           beam.material.dispose();
           pulse.material.dispose();
-          this._addStrand(origin, target, 0.34);
+          const tint = this._themeColor(light.theme);
+          this._addStrand(origin, target, 0.34, tint);
           const prev = this.signalled[this.signalled.length - 1];
           if (prev && prev !== storyId) {
             const prevLight = this.lights.get(prev);
-            if (prevLight) this._addStrand(prevLight.dir, target, 0.2);
+            if (prevLight) this._addStrand(prevLight.dir, target, 0.2, tint);
           }
           if (!this.signalled.includes(storyId)) this.signalled.push(storyId);
           resolve();
@@ -749,8 +755,15 @@ export class MoonScene {
     ], false, 'catmullrom', 0.25);
   }
 
-  /** A faint great-circle strand across the surface — part of the constellation. */
-  _addStrand(aDir, bDir, opacity = 0.3) {
+  /**
+   * A faint great-circle strand across the surface — part of the constellation.
+   * Coloured by the theme of the story it reaches, so the sky reads as what
+   * the visitor kept stopping for.
+   *
+   * @param {number} fade ms to fade in over; 0 draws it already there, which
+   *   is how a saved sky comes back without replaying every beam.
+   */
+  _addStrand(aDir, bDir, opacity = 0.3, color = 0xffc98f, fade = 1400) {
     const SEG = 64;
     const pts = [];
     const tmp = new THREE.Vector3();
@@ -762,14 +775,141 @@ export class MoonScene {
     const line = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(pts),
       new THREE.LineBasicMaterial({
-        color: 0xffc98f, transparent: true, opacity: 0,
+        color: new THREE.Color(color), transparent: true, opacity: 0,
         depthWrite: false, blending: THREE.AdditiveBlending,
       }),
     );
+    line.userData.baseOpacity = opacity;
     this.constellation.add(line);
+    if (!fade) {
+      line.material.opacity = opacity;
+      return;
+    }
     this._tween({
-      dur: 1400,
+      dur: fade,
       onUpdate: (raw) => { line.material.opacity = easeOut(raw) * opacity; },
+    });
+  }
+
+  _themeColor(theme) {
+    return new THREE.Color(THEMES[theme]?.color || '#ffc98f').getHex();
+  }
+
+  /**
+   * Redraws a saved sky at full strength, with no beam animation — the
+   * strands are simply already there when the visitor arrives.
+   *
+   * @param {Array<{id:string, theme:string|null}>} order signalled stories,
+   *   oldest first, exactly as they were sent.
+   */
+  restoreConstellation(order) {
+    const anchor = this.viewerAnchor || surfacePoint(-30, -20, 1);
+    let prev = null;
+    order.forEach(({ id, theme }) => {
+      const light = this.lights.get(id);
+      if (!light) return;                       // a story the visitor deleted
+      const tint = this._themeColor(theme || light.theme);
+      this._addStrand(anchor, light.dir, 0.34, tint, 0);
+      if (prev) this._addStrand(prev.dir, light.dir, 0.2, tint, 0);
+      light.el.classList.add('is-signalled');
+      if (!this.signalled.includes(id)) this.signalled.push(id);
+      prev = light;
+    });
+  }
+
+  /** Where a new keepsake sits: near the sky the visitor has actually built. */
+  _constellationAnchor(seed) {
+    const rand = mulberry32(7000 + seed * 613);
+    const centre = new THREE.Vector3();
+    this.signalled.forEach((id) => {
+      const l = this.lights.get(id);
+      if (l) centre.add(l.dir);
+    });
+    if (centre.lengthSq() < 1e-6) centre.copy(surfacePoint(-10, 0, 1));
+    centre.normalize();
+    // nudged off the centroid so several keepsakes do not stack up
+    const off = surfacePoint(-60 + rand() * 120, -120 + rand() * 240, 1);
+    return centre.clone().lerp(off, 0.26 + rand() * 0.2).normalize();
+  }
+
+  /** A soft twinkling mote, earned at a milestone. */
+  addStardust(id, seed = 0) {
+    if (this.stardust.has(id)) return;
+    const dir = this._constellationAnchor(seed);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.glow, color: 0xfff2d4, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    sprite.position.copy(dir).multiplyScalar(LIGHT_R + 0.045);
+    sprite.scale.setScalar(0.1);
+    this.constellation.add(sprite);
+    this.stardust.set(id, { sprite, phase: seed * 1.7, base: 0.1, dir });
+    this._tween({ dur: 1600, onUpdate: (r) => { sprite.material.opacity = easeOut(r) * 0.85; } });
+  }
+
+  /** A slow-turning polyhedron in a theme's colour, floating beside the sky. */
+  addCrystal(id, colorHex, seed = 0) {
+    if (this.crystals.has(id)) return;
+    const dir = this._constellationAnchor(seed + 40);
+    const color = new THREE.Color(colorHex);
+    const mesh = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.075, 0),
+      new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.9,
+        roughness: 0.25, metalness: 0.1,
+        transparent: true, opacity: 0, flatShading: true,
+      }),
+    );
+    mesh.position.copy(dir).multiplyScalar(LIGHT_R + 0.14);
+    this.constellation.add(mesh);
+
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.glow, color, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    halo.scale.setScalar(0.34);
+    mesh.add(halo);
+
+    this.crystals.set(id, { mesh, halo, spin: 0.25 + seed * 0.03, dir });
+    this._tween({
+      dur: 1800,
+      onUpdate: (r) => {
+        mesh.material.opacity = easeOut(r) * 0.92;
+        halo.material.opacity = easeOut(r) * 0.4;
+      },
+    });
+  }
+
+  /**
+   * The private view: pull back a little and let everything that is not the
+   * visitor's own sky fall away. Nothing is removed, only dimmed, so leaving
+   * the view puts it all back exactly as it was.
+   */
+  setPrivateView(on) {
+    if (this.privateView === on) return;
+    this.privateView = on;
+
+    const startRadius = this.cam.radius;
+    const target = on ? 4.3 : 3.05;
+    this._tween({
+      dur: this.reduced ? 220 : 1400,
+      onUpdate: (raw) => { this.cam.radius = lerp(startRadius, target, easeInOut(raw)); },
+    });
+
+    const mine = new Set(this.signalled);
+    this.lights.forEach((light) => {
+      const keep = !on || mine.has(light.id);
+      light.el.classList.toggle('is-muted', on && !keep);
+      light.sprite.material.opacity = keep ? 0.95 : 0.08;
+    });
+    if (this.quietLights) this.quietLights.material.opacity = on ? 0.06 : 0.75;
+    this.stars.material.opacity = on ? 0.35 : 0.85;
+    this.constellation.children.forEach((c) => {
+      if (c.isLine && c.userData.baseOpacity) {
+        c.material.opacity = on
+          ? Math.min(1, c.userData.baseOpacity * 2.2)
+          : c.userData.baseOpacity;
+      }
     });
   }
 
@@ -878,6 +1018,16 @@ export class MoonScene {
     this.stars.rotation.y += dt * 0.004;
     this.earthGlobe.rotation.y += dt * 0.03;
     this._updateRelay(dt);
+
+    // keepsakes: crystals turn slowly, stardust breathes
+    this.crystals.forEach((c) => {
+      c.mesh.rotation.y += dt * c.spin;
+      c.mesh.rotation.x += dt * c.spin * 0.45;
+    });
+    this.stardust.forEach((d) => {
+      d.phase += dt * 1.6;
+      d.sprite.scale.setScalar(d.base * (1 + Math.sin(d.phase) * 0.3));
+    });
 
     // light pulses
     this.lights.forEach((light) => {
