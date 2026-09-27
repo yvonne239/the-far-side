@@ -43,6 +43,23 @@ const progressEl = $('progress');
 const flightLine = $('flight-line');
 const flightFill = $('flight-fill');
 
+/**
+ * What lands on screen when the flight ends. Two lines rather than one string
+ * so the caption keeps its shape while it shrinks — no reflow mid-move.
+ * Keyed by path so the two journeys can diverge here later.
+ */
+const ARRIVAL_LINES = {
+  story: ["You've left the noise behind.", 'Welcome to the dark side.'],
+  discovery: ["You've left the noise behind.", 'Welcome to the dark side.'],
+};
+
+/** How long the caption holds at full size before it docks, in ms. */
+const ARRIVAL_HOLD = 2800;
+const ARRIVAL_HOLD_REDUCED = 900;
+
+/** Must match the transform transition on .arrival__text in base.css. */
+const ARRIVAL_GLIDE = 1150;
+
 /** The same five beats, named for whichever path the visitor took. */
 const RAILS = {
   story:     ['Arrive', 'Fly', 'Discover', 'Respond', 'Return'],
@@ -103,6 +120,73 @@ function anyOverlayOpen() {
   return Object.values(overlays).some((el) => el.classList.contains('is-active'));
 }
 
+/* ================================================================
+   the arrival caption
+   ================================================================ */
+
+/**
+ * Fades in centred when the flight lands, holds, then shrinks and slides up
+ * to sit as the title for the far side. It is pointer-events: none throughout,
+ * so it can pass over the Moon and the buttons without ever blocking them.
+ */
+const arrival = {
+  root: $('arrival'),
+  lines: [...$('arrival').querySelectorAll('.arrival__line')],
+  timer: null,
+
+  play(path) {
+    this.clear();
+    const copy = ARRIVAL_LINES[path] || ARRIVAL_LINES.story;
+    this.lines.forEach((el, i) => { el.textContent = copy[i] || ''; });
+
+    // Pin the start state and flush it synchronously, so the fade has
+    // somewhere to animate from. A forced reflow rather than rAF: rAF is
+    // throttled in a background tab, and the caption must not be left
+    // invisible just because the visitor looked away mid-flight.
+    document.body.dataset.arrival = 'off';
+    void this.root.offsetWidth;
+    document.body.dataset.arrival = 'in';
+
+    this.timer = setTimeout(
+      () => { document.body.dataset.arrival = 'docked'; },
+      prefersReducedMotion() ? ARRIVAL_HOLD_REDUCED : ARRIVAL_HOLD,
+    );
+  },
+
+  /** A one-off line that fades in, waits, and goes. No docking. */
+  flash(text, hold = 3200) {
+    this.clear();
+    this.lines[0].textContent = text;
+    this.lines[1].textContent = '';
+    document.body.dataset.arrival = 'off';
+    void this.root.offsetWidth;
+    document.body.dataset.arrival = 'flash';
+    this.timer = setTimeout(() => {
+      if (document.body.dataset.arrival === 'flash') this.clear();
+    }, prefersReducedMotion() ? 1600 : hold);
+  },
+
+  clear() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    document.body.dataset.arrival = 'none';
+  },
+};
+
+/** Shown when a light of the visitor's own lands on the far side. */
+const LIGHT_LANDED = 'Your light has joined the dark side.';
+
+/**
+ * The panel opens once the caption has finished moving, not during. Mounting a
+ * discovery widget is the heaviest thing that happens on arrival, and doing it
+ * mid-glide makes the caption stutter on anything slow.
+ */
+function arrivalPanelDelay() {
+  return prefersReducedMotion()
+    ? ARRIVAL_HOLD_REDUCED + 300
+    : ARRIVAL_HOLD + ARRIVAL_GLIDE + 120;
+}
+
 function setRail(path) {
   const labels = RAILS[path] || RAILS.story;
   progressEl.querySelectorAll('li').forEach((li, i) => {
@@ -130,6 +214,11 @@ function seatFor(index) {
   return { lat: -52 + rand() * 104, lon: -168 + rand() * 336 };
 }
 
+/**
+ * Puts everything the visitor has written back on both sides of the Moon: a
+ * light on the far side and a post card on the near one. Runs at boot, so a
+ * refresh loses nothing.
+ */
 function loadMyLights() {
   myLights = store.getReflections();
   myLights.forEach((r, i) => {
@@ -137,6 +226,7 @@ function loadMyLights() {
     const seat = seatFor(i);
     scene.addLight({ id: r.id, theme: r.theme, lat: seat.lat, lon: seat.lon, label: 'Yours', mine: true });
   });
+  if (feed) feed.setMine(myLights);
 }
 
 /** The shape the far-side panel wants, for either a sample story or your own. */
@@ -203,6 +293,7 @@ function goToPaths({ fresh = false } = {}) {
   Object.keys(overlays).forEach((k) => setOverlay(k, false));
   if (farSide) farSide.close();
   if (discover) discover.close();
+  arrival.clear();
   if (feed) feed.stopToasts();
   if (scene) scene.resetCamera();
 
@@ -226,6 +317,7 @@ function switchPath(path) {
   Object.keys(overlays).forEach((k) => setOverlay(k, false));
   farSide.close();
   discover.close();
+  arrival.clear();
   scene.resetCamera();
   scene.setActiveLight(null);
   state.selectedPost = null;
@@ -280,6 +372,25 @@ function closePost() {
   state.selectedPost = null;
 }
 
+/**
+ * A post the visitor wrote: no "what might be outside this frame?" sheet —
+ * they already know — so it flies straight round to their own light, which
+ * opens showing what they said people might not see.
+ */
+function flyToOwnLight(id, opts = {}) {
+  if (state.flying || !scene.lights.has(id)) return;
+  state.flying = true;
+  state.selectedPost = id;
+  Object.keys(overlays).forEach((k) => setOverlay(k, false));
+  feed.stopToasts();
+  startFlight(id, {
+    lines: FLIGHT_LINES,
+    mood: 'warm',
+    crossfade: () => sound.crossfadeToFar(prefersReducedMotion() ? 1.4 : 6),
+    arrive: () => enterFarSide(id, opts),
+  });
+}
+
 function seeOtherSide() {
   const id = state.selectedPost;
   if (!id || state.flying) return;
@@ -295,12 +406,15 @@ function seeOtherSide() {
   });
 }
 
-function enterFarSide(focusId) {
+function enterFarSide(focusId, { landed = false } = {}) {
   setPhase('far');
   setProgress('far');
   sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
+  if (landed) arrival.flash(LIGHT_LANDED);
+  else arrival.play('story');
   farSide.setCount(store.signalCount());
-  if (focusId) setTimeout(() => openStory(focusId, { skipFocus: true }), 500);
+  const delay = landed ? 900 : arrivalPanelDelay();
+  if (focusId) setTimeout(() => openStory(focusId, { skipFocus: true }), delay);
 }
 
 function openStory(id, { skipFocus = false } = {}) {
@@ -346,32 +460,49 @@ function openContribute() {
 
 function saveReflection({ bright, far, theme, intent }) {
   const entry = store.addReflection({ bright, far, theme, intent });
+  if (!entry) {
+    contribute.fail('This browser would not save it — private mode, or storage is full.');
+    return;
+  }
+
   myLights = store.getReflections();
-  const seat = seatFor(myLights.length - 1);
   scene.addLight({
     id: entry.id,
     theme: entry.theme,
-    lat: seat.lat,
-    lon: seat.lon,
+    ...seatFor(myLights.length - 1),
     label: 'Yours',
     mine: true,
   });
   scene.setFilter(scene.filter);
   contribute.renderList(myLights);
-  contribute.flash(
-    intent === 'shared'
-      ? 'Saved, and your light is on the far side. (No server in this demo — it stays in this browser.)'
-      : 'Kept private. Your light is on the far side, visible only to you.',
-  );
+  feed.addMine(entry, { fresh: true });        // shows up on the near side at once
   sound.chime(signalCounter++);
+
+  setOverlay('contribute', false);
+  const onFarSide = state.phase === 'far';
+
+  if (onFarSide) {
+    // already there: clear the filter so the new light cannot be hidden by it,
+    // then bring it round to the middle and leave it there
+    farSide.setFilter('all');
+    scene.setActiveLight(entry.id);
+    scene.focusLight(entry.id);
+    arrival.flash(LIGHT_LANDED);
+    setTimeout(() => openStory(entry.id, { skipFocus: true }), 700);
+  } else {
+    // on the near side: fly the same arc a post flies
+    flyToOwnLight(entry.id, { landed: true });
+  }
 }
 
 function deleteReflection(id) {
   store.removeReflection(id);
   myLights = store.getReflections();
-  scene.removeLight(id);
+  scene.removeLight(id);        // off the Moon
+  feed.removeMine(id);          // and off the near side
   contribute.renderList(myLights);
   if (state.currentStory === id) farSide.close();
+  if (state.selectedPost === id) closePost();
 }
 
 function openClosing() {
@@ -424,8 +555,9 @@ function enterDiscover(focusId) {
   setPhase('discover');
   setProgress('far');
   sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
+  arrival.play('discovery');
   discover.setCount(discovered.length, DISCOVERIES.length);
-  if (focusId) setTimeout(() => openDiscovery(focusId, { skipFocus: true }), 500);
+  if (focusId) setTimeout(() => openDiscovery(focusId, { skipFocus: true }), arrivalPanelDelay());
 }
 
 function openDiscovery(id, { skipFocus = false } = {}) {
@@ -455,6 +587,7 @@ function markRevealed(id) {
 
 function backToSights() {
   discover.close();
+  arrival.clear();
   state.currentDiscovery = null;
   scene.resetCamera();
   scene.setActiveLight(null);
@@ -469,6 +602,7 @@ function backToSights() {
    ================================================================ */
 
 function startFlight(id, { lines, mood, crossfade, arrive }) {
+  arrival.clear();
   state.flightLines = lines;
   state.flightLineIndex = -1;
   setPhase('flight');
@@ -508,6 +642,7 @@ function updateFlightHud(p) {
 
 function restart() {
   Object.keys(overlays).forEach((k) => setOverlay(k, false));
+  arrival.clear();
   farSide.close();
   farSide.setFilter('all');
   discover.close();
@@ -572,6 +707,7 @@ function boot() {
     toastRoot: $('toasts'),
     stories: STORIES,
     onSelect: selectPost,
+    onSelectMine: (id) => flyToOwnLight(id),
   });
 
   sights = new Sights({
@@ -635,6 +771,7 @@ function boot() {
   $('btn-flip-moon').addEventListener('click', flipToDiscovery);
   $('btn-skip').addEventListener('click', () => scene.skipFlight());
   $('btn-contribute').addEventListener('click', openContribute);
+  $('btn-contribute-near').addEventListener('click', openContribute);
   $('btn-return').addEventListener('click', openClosing);
   $('btn-back-to-far').addEventListener('click', () => setOverlay('closing', false));
   $('btn-back-to-sights').addEventListener('click', backToSights);

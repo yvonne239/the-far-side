@@ -10,25 +10,31 @@
  *
  * Two ways to have music, then:
  *
- *  1. Supply your own licensed file. Drop it in `assets/` and point
- *     MOON_THEME_URL at it. Anything the browser can decode works. It will be
- *     used instead of everything below, looped, ducked under the ambience,
- *     and muted along with the rest of the sound.
+ *  1. A supplied recording — currently `moonflip.mp3`, sitting next to this
+ *     file and pointed at by MOON_THEME_URL. It is looped, ducked under the
+ *     ambience, and muted along with the rest of the sound. Making sure the
+ *     rights for that file cover wherever this gets published is the job of
+ *     whoever put it there; nothing in this code can check it.
  *
- *  2. Use the built-in instrumental, which is what plays by default. It is an
- *     original tune written for this project, played on synthesised
- *     instruments. It sits on the circle-of-fifths turnaround that the jazz
- *     standards share — Am7 · Dm7 · G7 · Cmaj7 · Fmaj7 · Bm7♭5 · E7 · Am6 —
- *     in a slow 3/4, because chord progressions are common property and that
- *     particular one is most of why those tunes feel the way they do. The
- *     melody over it is deliberately not anybody else's melody.
+ *  2. The built-in instrumental below, used whenever MOON_THEME_URL is null
+ *     or the file fails to load. It is an original tune written for this
+ *     project, played on synthesised instruments. It sits on the
+ *     circle-of-fifths turnaround that the jazz standards share — Am7 · Dm7 ·
+ *     G7 · Cmaj7 · Fmaj7 · Bm7♭5 · E7 · Am6 — in a slow 3/4, because chord
+ *     progressions are common property and that particular one is most of why
+ *     those tunes feel the way they do. The melody over it is deliberately not
+ *     anybody else's melody.
  */
 
 /**
- * Path to a licensed recording, or null for the built-in instrumental.
- * e.g. './assets/moon-theme.mp3'
+ * The recording to play on the far side, or null for the built-in
+ * instrumental below.
+ *
+ * Resolved against this module rather than the page, so it keeps working
+ * wherever index.html is served from. Set it back to null to fall back to the
+ * synthesised tune.
  */
-export const MOON_THEME_URL = null;
+export const MOON_THEME_URL = new URL('./moonflip.mp3', import.meta.url).href;
 
 const TEMPO = 96;                  // beats per minute, 3/4
 const BEAT = 60 / TEMPO;

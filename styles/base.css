@@ -441,6 +441,105 @@ body[data-path="discovery"] .progress li.is-current::before { box-shadow: 0 0 12
   100% { transform: scale(1.9);  opacity: 0; }
 }
 
+/* ---------- arrival caption ----------
+
+   Sits above the Moon and the projected lights but below #ui, so a story or
+   discovery panel opening over it wins. Never takes pointer events, so it
+   cannot swallow a click on a button underneath at any point in the move.   */
+
+.arrival {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.9s var(--ease), visibility 0.9s step-end;
+}
+body[data-arrival="in"] .arrival,
+body[data-arrival="flash"] .arrival,
+body[data-arrival="docked"] .arrival {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.9s var(--ease), visibility 0s;
+}
+
+.arrival__text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  width: max-content;
+  max-width: min(22ch, calc(100vw - 48px));
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 4.6vw, 3rem);
+  line-height: 1.24;
+  color: var(--ink);
+  text-shadow: 0 2px 40px rgba(0, 0, 0, 0.9), 0 0 90px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  /* the shrink is a transform, not a font-size change, so the two lines never
+     reflow on the way up — it glides rather than snapping between layouts */
+  transform: translate(-50%, -50%) translateY(18px);
+  transition: transform 1.15s var(--ease), opacity 0.9s var(--ease);
+}
+.arrival__line { display: block; }
+.arrival__line:last-child:empty { display: none; }
+
+body[data-arrival="in"] .arrival__text {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+/* Docked, it becomes the title for the far side. On a wide screen it settles
+   into the empty middle of the chrome bar — the brand is hard left and the
+   controls hard right — so the filter bar underneath does not have to move,
+   and therefore never slides behind the story panel. */
+/* A one-off message that simply fades in, waits and goes — used when a light
+   of your own lands on the far side. No docking, no layout to move. */
+body[data-arrival="flash"] .arrival {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.9s var(--ease), visibility 0s;
+}
+body[data-arrival="flash"] .arrival__text {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+body[data-arrival="docked"] .arrival__text {
+  opacity: 0.85;
+  transform: translate(-50%, -50%) translateY(calc(50px - 50vh)) scale(0.28);
+}
+
+/* Narrow screens have no empty middle up there: the brand and the controls
+   meet. So the caption drops below the chrome and the filter bar steps down
+   to meet it — safe here, because the panel is a bottom sheet at this width
+   and there is nothing to collide with. */
+@media (max-width: 860px) {
+  /* A one-off message that simply fades in, waits and goes — used when a light
+   of your own lands on the far side. No docking, no layout to move. */
+body[data-arrival="flash"] .arrival {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.9s var(--ease), visibility 0s;
+}
+body[data-arrival="flash"] .arrival__text {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+body[data-arrival="docked"] .arrival__text {
+    transform: translate(-50%, -50%) translateY(calc(86px - 50vh)) scale(0.46);
+  }
+  .far-top { transition: top 0.9s var(--ease); }
+  body[data-arrival="docked"] .far-top { top: clamp(116px, calc(10vh + 52px), 150px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no long glide: it simply appears where it belongs */
+  .arrival__text { transition-duration: 0.2s, 0.2s; }
+}
+
 /* ---------- reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {

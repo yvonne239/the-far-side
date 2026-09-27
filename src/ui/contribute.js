@@ -20,7 +20,7 @@ export class Contribute {
     this._intent = 'private';
 
     this._buildThemes();
-    this._wireCounters();
+    this._wireAutoGrow();
 
     // remember which button submitted the form
     this.form.querySelectorAll('button[type="submit"]').forEach((btn) => {
@@ -55,14 +55,29 @@ export class Contribute {
     });
   }
 
-  _wireCounters() {
-    document.querySelectorAll('[data-count-for]').forEach((out) => {
-      const input = document.getElementById(out.dataset.countFor);
-      if (!input) return;
-      const max = input.getAttribute('maxlength');
-      const update = () => { out.textContent = `${input.value.length} / ${max}`; };
-      input.addEventListener('input', update);
-      update();
+  /**
+   * No character limit and no counter: the fields simply grow with whatever
+   * gets written. Height is reset to auto first so the box can shrink again
+   * when text is deleted, not just expand.
+   */
+  _wireAutoGrow() {
+    this._grown = [this.bright, this.far];
+    this._grown.forEach((el) => {
+      el.addEventListener('input', () => this._grow(el));
+      this._grow(el);
+    });
+  }
+
+  _grow(el) {
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }
+
+  _resetFields() {
+    this._grown.forEach((el) => {
+      el.value = '';
+      el.style.height = '';
+      this._grow(el);
     });
   }
 
@@ -77,12 +92,12 @@ export class Contribute {
     }
     this.error.textContent = '';
     this.onSave({ bright, far, theme: this.theme, intent: this._intent });
-    this.bright.value = '';
-    this.far.value = '';
-    document.querySelectorAll('[data-count-for]').forEach((out) => {
-      const input = document.getElementById(out.dataset.countFor);
-      if (input) out.textContent = `0 / ${input.getAttribute('maxlength')}`;
-    });
+    this._resetFields();
+  }
+
+  /** Something went wrong saving — say so instead of pretending it worked. */
+  fail(message) {
+    this.error.textContent = message;
   }
 
   /** Re-render the visitor's own saved lights. */
@@ -92,7 +107,7 @@ export class Contribute {
 
     const title = document.createElement('p');
     title.className = 'my-lights__title';
-    title.textContent = `Your lights on the far side (${reflections.length})`;
+    title.textContent = `Your lights on the dark side (${reflections.length})`;
     this.list.appendChild(title);
 
     reflections.slice().reverse().forEach((r) => {

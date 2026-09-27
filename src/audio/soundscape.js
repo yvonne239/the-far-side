@@ -36,6 +36,14 @@ export class Soundscape {
   /** How far the ambient pad drops while the theme is playing over it. */
   static PAD_DUCK = 0.14;
 
+  /**
+   * Level for the theme bus. A mastered recording is a far denser signal than
+   * the sparse built-in instrumental — moonflip.mp3 measures about three times
+   * the mean amplitude — so it gets a lower gain to sit at a comparable place
+   * in the mix. Raise RECORDING if you want the music more forward.
+   */
+  static THEME_LEVEL = { synth: 0.5, recording: 0.3 };
+
   /** Must be called from a user gesture (browser autoplay policy). */
   init() {
     if (this.ready) return true;
@@ -204,8 +212,9 @@ export class Soundscape {
     if (!this.ready || !this.music) return;
     this.resume();
     this._themeToken += 1;
+    const level = this.themeLevel();
     if (this.music.playing) {
-      this._ramp(this.nodes.theme, 0.5, seconds);
+      this._ramp(this.nodes.theme, level, seconds);
       return;
     }
 
@@ -219,7 +228,14 @@ export class Soundscape {
     });
 
     this.music.start();
-    this._ramp(this.nodes.theme, 0.5, seconds);
+    this._ramp(this.nodes.theme, level, seconds);
+  }
+
+  /** A supplied recording sits lower in the mix than the built-in tune. */
+  themeLevel() {
+    return this.music && this.music.buffer
+      ? Soundscape.THEME_LEVEL.recording
+      : Soundscape.THEME_LEVEL.synth;
   }
 
   /** Leaving the far side: let the theme go and give the pad its level back. */

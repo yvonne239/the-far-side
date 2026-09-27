@@ -40,6 +40,15 @@
   <!-- Far-side lights, projected from 3D to screen space -->
   <div id="markers" class="markers" aria-hidden="true"></div>
 
+  <!-- Arrival caption: lands centred when the flight ends, then shrinks and
+       docks at the top as the title for the far side. Never interactive. -->
+  <div id="arrival" class="arrival" aria-live="polite">
+    <p class="arrival__text">
+      <span class="arrival__line"></span>
+      <span class="arrival__line"></span>
+    </p>
+  </div>
+
   <!-- ============ Persistent chrome ============ -->
   <header id="chrome" class="chrome">
     <div class="brand">
@@ -167,6 +176,11 @@
       <h2 id="bright-title" class="sr-only">The side of the Moon that faces us: shared moments</h2>
       <div id="feed" class="feed"></div>
       <div id="toasts" class="toasts" aria-hidden="true"></div>
+      <div class="near-actions">
+        <button id="btn-contribute-near" class="btn btn--secondary btn--sm" type="button">
+          Add your two sides
+        </button>
+      </div>
       <p class="hint hint--bottom">
         <span class="hint__pulse" aria-hidden="true"></span>
         Pick a post. Ask what might be outside its frame.
@@ -337,16 +351,14 @@
         <form id="contribute-form" class="form" novalidate>
           <label class="field">
             <span class="field__label">What people might see</span>
-            <textarea id="input-bright" class="field__input" rows="2" maxlength="160"
+            <textarea id="input-bright" class="field__input field__input--grow" rows="2"
               placeholder="I'm doing well in my classes." required></textarea>
-            <span class="field__count" data-count-for="input-bright">0 / 160</span>
           </label>
 
           <label class="field field--warm">
             <span class="field__label">What they might not see</span>
-            <textarea id="input-far" class="field__input" rows="3" maxlength="240"
+            <textarea id="input-far" class="field__input field__input--grow" rows="3"
               placeholder="I'm afraid to admit how overwhelmed I feel." required></textarea>
-            <span class="field__count" data-count-for="input-far">0 / 240</span>
           </label>
 
           <fieldset class="field field--row">

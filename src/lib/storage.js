@@ -39,19 +39,24 @@ export function getReflections() {
   return Array.isArray(list) ? list : [];
 }
 
+/**
+ * Stores what the visitor wrote, whole. The old 160/240 caps are gone along
+ * with the ones on the inputs — truncating here would quietly lose the end of
+ * a long entry. Returns null if the browser refused to store it (private
+ * mode, or quota) so the caller can say so rather than pretending it saved.
+ */
 export function addReflection({ bright, far, theme, intent }) {
   const list = getReflections();
   const entry = {
-    id: `mine-${Date.now().toString(36)}`,
-    bright: String(bright).slice(0, 160),
-    far: String(far).slice(0, 240),
+    id: `mine-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    bright: String(bright),
+    far: String(far),
     theme: theme || 'uncertainty',
     intent: intent === 'shared' ? 'shared' : 'private',
     createdAt: new Date().toISOString(),
   };
   list.push(entry);
-  write(KEYS.reflections, list);
-  return entry;
+  return write(KEYS.reflections, list) ? entry : null;
 }
 
 export function removeReflection(id) {
