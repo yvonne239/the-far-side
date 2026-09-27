@@ -134,6 +134,10 @@ body[data-phase="intro"] #scene { cursor: default; }
 .screen--center.is-active { pointer-events: auto; }
 
 .screen--scrim {
+  /* Screens are siblings with z-index:auto, so a positioned element inside an
+     earlier screen can paint over a later one. A modal has to win outright,
+     whatever the screen underneath sets. */
+  z-index: 30;
   background: radial-gradient(90% 70% at 50% 50%, rgba(4, 5, 12, 0.72), rgba(3, 4, 9, 0.93));
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);

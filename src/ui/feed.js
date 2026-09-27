@@ -169,7 +169,9 @@ export class Feed {
     cards.forEach((card, i) => {
       card.style.left = `${7 + i * 5}%`;
       card.style.top = `${57 - i * 7}%`;
-      card.style.zIndex = String(6 + (cards.length - i));
+      // bounded: newest on top of the samples, but never high enough to climb
+      // over the near-side controls or a modal
+      card.style.zIndex = String(Math.max(1, 5 - i));
     });
   }
 
