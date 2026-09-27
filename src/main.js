@@ -11,6 +11,7 @@ import { mulberry32, prefersReducedMotion } from './lib/util.js';
 import {
   earned, newlyEarned, recordGivingDay, sentToday, localDay,
 } from './lib/progress.js';
+import { needsCare } from './lib/care.js';
 
 /* ================================================================
    elements
@@ -60,6 +61,7 @@ const state = {
   selectedPost: null,     // story chosen on the near side
   currentStory: null,     // story open on the far side
   flying: false,
+  careDue: false,         // something heavy was just written
   flightLines: FLIGHT_LINES,
   flightLineIndex: -1,
 };
@@ -154,6 +156,23 @@ const arrival = {
 
 /** Shown when a light of the visitor's own lands on the far side. */
 const LIGHT_LANDED = 'Your light has joined the dark side.';
+
+/**
+ * A quiet offer of help, shown under the arrival line when somebody has just
+ * written something heavy. It does not time out — it waits to be closed —
+ * and it never interrupts: the post is already saved by the time it appears.
+ */
+const care = {
+  el: null,
+  show() {
+    if (!this.el) this.el = $('care');
+    this.el.hidden = false;
+  },
+  hide() {
+    if (!this.el) this.el = $('care');
+    this.el.hidden = true;
+  },
+};
 
 /**
  * Milestone lines wait their turn rather than talking over each other, and
@@ -402,8 +421,12 @@ function enterFarSide(focusId, { landed = false } = {}) {
   setPhase('far');
   setProgress('far');
   sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
-  if (landed) arrival.flash(LIGHT_LANDED);
-  else arrival.play();
+  if (landed) {
+    arrival.flash(LIGHT_LANDED);
+    if (state.careDue) { state.careDue = false; setTimeout(() => care.show(), 900); }
+  } else {
+    arrival.play();
+  }
   farSide.setCount(store.signalCount());
   restoreSky();
   const delay = landed ? 900 : arrivalPanelDelay();
@@ -502,6 +525,8 @@ function saveReflection({ bright, far, theme, intent }) {
   sound.chime(signalCounter++);
 
   setOverlay('contribute', false);
+  // checked across both sides together, so a phrase split between them counts
+  state.careDue = needsCare(bright, far);
   const onFarSide = state.phase === 'far';
 
   if (onFarSide) {
@@ -511,6 +536,7 @@ function saveReflection({ bright, far, theme, intent }) {
     scene.setActiveLight(entry.id);
     scene.focusLight(entry.id);
     arrival.flash(LIGHT_LANDED);
+    if (state.careDue) { state.careDue = false; setTimeout(() => care.show(), 900); }
     setTimeout(() => openStory(entry.id, { skipFocus: true }), 700);
   } else {
     // on the near side: fly the same arc a post flies
@@ -589,6 +615,7 @@ function updateFlightHud(p) {
 function restart() {
   Object.keys(overlays).forEach((k) => setOverlay(k, false));
   arrival.clear();
+  care.hide();
   farSide.close();
   scene.resetCamera();
   scene.setActiveLight(null);
@@ -687,6 +714,7 @@ function boot() {
   $('btn-skip').addEventListener('click', () => scene.skipFlight());
   $('btn-contribute').addEventListener('click', openContribute);
   $('btn-constellation').addEventListener('click', toggleConstellation);
+  $('btn-care-close').addEventListener('click', () => care.hide());
   $('btn-contribute-near').addEventListener('click', openContribute);
   $('btn-return').addEventListener('click', openClosing);
   $('btn-back-to-far').addEventListener('click', () => setOverlay('closing', false));

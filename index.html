@@ -48,6 +48,17 @@
     </p>
   </div>
 
+  <!-- Sits below the arrival caption when someone writes something heavy.
+       Stays until it is closed: it never times out, never blocks, and the
+       post it responds to is saved exactly as written. -->
+  <div id="care" class="care" role="status" aria-live="polite" hidden>
+    <div class="care__card">
+      <p class="care__line">You don't have to carry this alone.</p>
+      <a class="care__link" href="#notice-safety" data-open-notice="safety">Support resources →</a>
+      <button id="btn-care-close" class="care__close" type="button" aria-label="Close this message">×</button>
+    </div>
+  </div>
+
   <!-- ============ Persistent chrome ============ -->
   <header id="chrome" class="chrome">
     <div class="brand">
