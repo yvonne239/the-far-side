@@ -189,108 +189,6 @@
 }
 
 /* ============================================================
-   Choosing a path
-   ============================================================ */
-
-.paths {
-  width: min(880px, 100%);
-  text-align: center;
-  animation: rise 0.8s var(--ease) both;
-}
-.paths__head { max-width: 58ch; margin: 0 auto 26px; }
-.paths__head .lede { margin-inline: auto; }
-
-.paths__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 16px;
-  text-align: left;
-}
-
-.path-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 24px 24px 22px;
-  font: inherit;
-  text-align: left;          /* buttons centre their text by default */
-  color: var(--ink);
-  background: linear-gradient(168deg, rgba(20, 24, 40, 0.88), rgba(9, 11, 20, 0.94));
-  border: 1px solid var(--glass-line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  cursor: pointer;
-  overflow: hidden;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: transform 0.35s var(--ease), border-color 0.35s, box-shadow 0.35s;
-}
-.path-card:hover,
-.path-card:focus-visible {
-  transform: translateY(-5px);
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow: var(--shadow), 0 0 60px -22px var(--accent);
-}
-.path-card--story    { --accent: var(--warm); }
-.path-card--discover { --accent: var(--clear); }
-
-.path-card__constellation {
-  position: absolute;
-  top: 14px; right: 14px;
-  width: 108px;
-  opacity: 0.4;
-  pointer-events: none;
-  transition: opacity 0.4s var(--ease);
-}
-.path-card:hover .path-card__constellation { opacity: 0.85; }
-.path-card__constellation svg { width: 100%; height: auto; display: block; }
-.path-card__constellation polyline {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 1;
-  opacity: 0.5;
-}
-.path-card__constellation circle {
-  fill: var(--accent);
-  filter: drop-shadow(0 0 4px var(--accent));
-}
-
-.path-card__eyebrow {
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.path-card__title {
-  font-family: var(--font-display);
-  font-size: clamp(1.95rem, 4.4vw, 2.5rem);
-  line-height: 1.08;
-  max-width: 11ch;           /* keeps the title clear of the constellation */
-}
-.path-card__desc {
-  font-size: 0.87rem;
-  font-weight: 300;
-  line-height: 1.6;
-  color: var(--ink-soft);
-}
-.path-card__desc em { color: var(--ink); font-style: italic; }
-.path-card__go {
-  margin-top: 10px;
-  font-size: 0.84rem;
-  font-weight: 500;
-  color: var(--accent);
-}
-
-.paths__note {
-  margin: 22px 0 0;
-  font-size: 0.78rem;
-  color: var(--ink-faint);
-}
-.paths__note strong { color: var(--ink-soft); font-weight: 500; }
-
-/* ============================================================
    Bright side: the feed
    ============================================================ */
 
@@ -505,122 +403,6 @@
   }
 }
 
-/* ============================================================
-   Near side: everyday sights (path two)
-   ============================================================ */
-
-.sight-card {
-  position: absolute;
-  width: clamp(190px, 21vw, 252px);
-  padding: 0;
-  text-align: left;
-  font: inherit;
-  color: var(--ink);
-  background: linear-gradient(165deg, rgba(20, 28, 34, 0.9), rgba(10, 14, 22, 0.93));
-  border: 1px solid color-mix(in srgb, var(--c, var(--clear)) 26%, transparent);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 18px 46px -18px rgba(0, 0, 0, 0.9);
-  overflow: hidden;
-  cursor: pointer;
-  pointer-events: auto;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: transform 0.4s var(--ease), border-color 0.4s, box-shadow 0.4s, opacity 0.6s;
-  animation: cardIn 0.9s var(--ease) both, drift var(--drift, 11s) var(--ease-soft) infinite alternate;
-  animation-delay: var(--delay, 0s), var(--delay, 0s);
-}
-.sight-card:hover,
-.sight-card:focus-visible {
-  transform: translateY(-6px) scale(1.035);
-  border-color: var(--c, var(--clear));
-  box-shadow: 0 26px 60px -18px rgba(0, 0, 0, 0.95), 0 0 34px -6px color-mix(in srgb, var(--c) 45%, transparent);
-  z-index: 5;
-}
-.sight-card.is-seen { opacity: 0.62; }
-.sight-card.is-seen .sight-card__media::before {
-  content: "flipped";
-  position: absolute;
-  z-index: 3;
-  right: 8px; bottom: 8px;
-  padding: 3px 8px;
-  font-size: 0.56rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #0a1014;
-  background: var(--c, var(--clear));
-  border-radius: 999px;
-}
-
-.sight-card__media {
-  position: relative;
-  aspect-ratio: 5 / 3;
-  background: var(--grad);
-}
-.sight-card__media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.5));
-}
-.sight-card__emoji {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 2.1rem;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
-  z-index: 1;
-}
-.sight-card__tag {
-  position: absolute;
-  top: 8px; left: 8px;
-  z-index: 2;
-  padding: 3px 9px;
-  font-size: 0.55rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #0a1014;
-  background: var(--c, var(--clear));
-  border-radius: 999px;
-}
-.sight-card__body { padding: 12px 14px 14px; }
-.sight-card__label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 0.6rem;
-  letter-spacing: 0.17em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-.sight-card__question {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.02rem;
-  line-height: 1.32;
-}
-
-.sight-card--hero {
-  position: relative;
-  width: 100%;
-  animation: rise 0.6s var(--ease) both;
-  cursor: default;
-}
-.sight-card--hero:hover { transform: none; }
-.sight-card--hero .sight-card__media { aspect-ratio: 16 / 9; }
-.sight-card--hero .sight-card__emoji { font-size: 3rem; }
-.sight-card--hero .sight-card__question { font-size: 1.28rem; }
-
-@media (max-width: 760px) {
-  .sight-card {
-    position: relative !important;
-    left: auto !important; top: auto !important;
-    width: 100%;
-    animation: cardIn 0.7s var(--ease) both;
-  }
-}
-
 /* ---------- comparison toasts ---------- */
 
 .toasts {
@@ -673,10 +455,6 @@
   max-width: calc(100vw - 32px);
 }
 .hint--bottom { bottom: clamp(18px, 4vh, 38px); }
-body[data-path="discovery"] .hint__pulse {
-  background: var(--clear);
-  box-shadow: 0 0 12px var(--clear);
-}
 .hint__pulse {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -706,10 +484,6 @@ body[data-path="discovery"] .hint__pulse {
   margin: 7px 0 0;
   font-size: 0.8rem;
   color: var(--ink-faint);
-}
-.post-question--cool {
-  border-left-color: var(--clear);
-  background: linear-gradient(90deg, rgba(127, 228, 220, 0.09), transparent);
 }
 
 /* ============================================================

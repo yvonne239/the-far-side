@@ -6,13 +6,10 @@ An interactive Moon that asks one question: *what else is happening here?*
 
 The half of the Moon facing Earth is the half we notice first. Fly around it and
 there is always another side — one that was there the whole time, just pointed
-somewhere else. Sometimes what is back there is a person's unseen effort or
-feeling. Sometimes it is a surprising mechanism inside something ordinary, or the
-people and infrastructure holding up a convenience nobody thinks about.
+somewhere else. Here, what is back there is the part of a moment someone chose
+not to post.
 
-Two paths leave the same opening screen. Both use the same Moon and the same
-interaction — **look → flip → reveal** — and you can switch between them at any
-point without restarting.
+One Moon, one interaction: **look → flip → reveal.**
 
 | Arrive | The far side |
 | --- | --- |
@@ -23,9 +20,7 @@ point without restarting.
 
 ---
 
-## Path one — Behind the Moment
-
-*Human stories. Feeling: empathy.*
+## The journey
 
 A visible achievement or a happy photo, and the context someone chose to share
 about it.
@@ -47,77 +42,40 @@ about it.
    beam travels from where you landed, up through an orbiting relay satellite and
    down onto the story's light, leaving a faint strand behind. Those strands build
    a constellation. There are no popularity scores anywhere in the piece.
-5. **Return.** Write your own two lines, then take one small real-world action
+5. **Return.** Write your own two sides, then take one small real-world action
    with the message already written for you.
 
 All stories shipped with the project are **clearly labelled samples** written for
 the demo. No real person's words are in this repository.
 
-## Path two — Hidden in Plain Sight
+### Writing your own
 
-*Everyday discoveries. Feeling: curiosity.*
+The "Add your two sides" panel opens from either side of the Moon. What you write
+becomes two things at once: a light on the far side, and a post at the head of
+the near-side feed carrying a gold **MINE** badge, `@you` and *just now*. Clicking
+that post flies you round to your own light. Both are restored on reload and
+removed together when you delete. Everything stays in `localStorage`.
 
-Something familiar, flipped — under one of two questions:
+## The music
 
-- **How does it work?** — the mechanism hiding inside the ordinary thing.
-- **What makes it possible?** — the people, places and systems behind the
-  convenience.
+Once the Moon has flipped, a theme fades in on the far side and the ambient pad
+ducks under it. `src/audio/moonflip.mp3` is what plays, pointed at by
+`MOON_THEME_URL` in `src/audio/music.js`. Set that constant to `null` and an
+original synthesised instrumental plays instead — it also takes over
+automatically if the file fails to load, and swaps in mid-flight if the recording
+finishes decoding after the theme has already started.
 
-Five interactive reveals, each with its source on the panel:
-
-| | Front | Flip | You can |
-| --- | --- | --- | --- |
-| 🌑 | "The dark side of the Moon never sees the Sun… right?" | *Plot twist: I get sunlight too.* | Drag the Sun through a 29.5-day cycle and watch the terminator move across **the real 3D Moon behind the panel**, next to a top-down diagram of Sun, Moon and Earth. |
-| 🌧️ | "Why does the ground smell different after rain?" | *The ground is exhaling.* | Release a raindrop, zoom into the contact point, and watch trapped air bubbles rise and burst into aerosols. Compare light rain with a downpour, porous soil with packed stone. |
-| 🔲 | "I scratched the code. Why does it still scan?" | *It was written expecting damage.* | Scratch a QR illustration and watch the recovery budget, at each of the four error-correction levels — then find out why the corner squares are different. |
-| ☁️ | A photo floats into a soft little cloud. | *The cloud is a building. Several, actually.* | Open the cloud into a branching map — journey, data centre, disks, electricity, cooling, people — and read each node. |
-| 🎤 | "The concert looked completely effortless." | *Effortless is a finish, not a start.* | Open the night into rehearsal, load-in, sound crew, stage management, volunteers and the get-out. |
-
-Every reveal carries a **"worth being precise about"** note saying where the
-simulation stops and where the evidence actually is — the QR widget is an
-illustration and not a scanner, petrichor is one contributor to the smell and not
-the whole story, the concert is an illustrative composite rather than testimony,
-and no per-photo energy figure is claimed for the cloud. Each discovery then
-offers **wider connections** to follow: undersea cables, Reed–Solomon in Voyager,
-sea-spray aerosols, tidal locking in the rest of the Solar System.
-
-## The music, and why it isn't *Fly Me to the Moon*
-
-Once the Moon has flipped and you arrive on the far side — on either path — a
-theme fades in and the ambient pad ducks underneath it.
-
-The obvious tune for a project on this theme is "Fly Me to the Moon", and it is
-not ours to ship. Bart Howard wrote it in 1954 and the composition is under
-copyright into the 2040s; every recording of it carries a second, separate
-copyright in the master. So there is no part of that song in this repository.
-
-**What plays by default** is an original instrumental written for the project
-and synthesised in the browser like everything else here. It sits on the
-circle-of-fifths turnaround those standards share — Am7 · Dm7 · G7 · Cmaj7 ·
-Fmaj7 · Bm7♭5 · E7 · Am6, slow 3/4, brushes and upright-ish bass — because chord
-progressions are common property and that progression is most of why those tunes
-feel the way they do. The melody over it is deliberately nobody else's melody.
-
-**To use a real recording** you have licensed, drop the file in `assets/` and
-point one constant at it:
-
-```js
-// src/audio/music.js
-export const MOON_THEME_URL = './assets/moon-theme.mp3';
-```
-
-Anything the browser can decode works. It is looped, ducked and muted exactly
-like the built-in version, and if it fails to load the instrumental takes over
-rather than leaving silence.
+"Fly Me to the Moon" itself is not in this repository: Bart Howard wrote it in
+1954, the composition is under copyright into the 2040s, and every recording
+carries a second copyright in the master.
 
 ### A note on "dark side"
 
 The far side is the hemisphere pointing away from Earth. That is a fact about
 direction, not about light: over one cycle nearly all of it gets about two weeks
 of sunlight and two weeks of night, and at New Moon it is in full daylight. The
-project keeps the phrase *far side* for the geography and makes the misconception
-the very first thing the Moon corrects about itself. (The genuine exception —
-permanently shadowed polar crater floors — is in the panel too.)
+piece uses *dark side* for the mood of the place you arrive in, not as a claim
+about sunlight.
 
 ---
 
@@ -146,46 +104,37 @@ map, so the first load needs an internet connection.
 The repo ships with `.github/workflows/deploy.yml`, which publishes the site on
 every push to `main`. In your repository: **Settings → Pages → Build and
 deployment → Source: GitHub Actions**. That's it — no build, the repo root is
-the site. The repository name is unchanged, so the published URL stays put.
+the site.
 
 ---
 
 ## How it's built
 
 Vanilla ES modules, [three.js](https://threejs.org) r161 via import map, the Web
-Audio API, and CSS. No framework, no bundler, and no binary assets in the site
-itself — the Moon and Earth textures are drawn into a `<canvas>` at load time
-from a seeded PRNG, and every sound is synthesised in the browser. (The only
-images in the repo are the README screenshots.)
+Audio API, and CSS. No framework and no bundler.
 
 ```
-index.html               markup for every screen, both paths
+index.html               markup for every screen
 styles/
   base.css               tokens, stage, projected marker layer
-  ui.css                 panels, path cards, feed + sight cards, forms
-  discover.css           the reveal panel and all four widgets
+  ui.css                 panels, feed cards, story panel, forms
 src/
-  main.js                the router: paths, phases, and all wiring
+  main.js                the journey, and all the wiring
   data/
     stories.js           the paired sample stories, themes, signals, copy
-    discoveries.js       the five discoveries, their content and their sources
     actions.js           return-to-Earth actions + copyable messages
   moon/
-    scene.js             Moon, tracked lights, relay, flight, beams, sun lab
-    textures.js          procedural Moon and Earth textures
+    scene.js             Moon, lights, relay, flight, beams, constellation
+    textures.js          procedural fallback Moon and Earth textures
+    moon_color.jpg       lunar albedo map (equirectangular)
+    moon_height.jpg      matching height map, used as a bump map
   audio/
-    soundscape.js        four synthesised worlds and the crossfades between them
-    music.js             the far-side theme: original instrumental, or your file
+    soundscape.js        two synthesised worlds and the crossfade between them
+    music.js             the far-side theme: the recording, or an original
+    moonflip.mp3         the recording that plays on the far side
   ui/
-    feed.js              near-side feed cards + comparison toasts (path one)
-    sights.js            near-side everyday sights (path two)
+    feed.js              near-side feed cards + comparison toasts
     farside.js           filters, story panel, signal relay buttons
-    discover.js          filters, reveal panel, widget lifecycle
-    widgets/
-      sunlab.js          the lunar cycle, driving the diagram and the real Sun
-      petrichor.js       canvas simulation of bubble-burst aerosols
-      qr.js              scratchable QR illustration + error-correction budget
-      nodemap.js         branching map of what holds something up
     contribute.js        the two-sided reflection form
     closing.js           return-to-Earth actions and clipboard
   lib/
@@ -195,36 +144,25 @@ src/
 
 ### Details worth knowing
 
+- **The Moon is a real map.** `scene.js` builds the sphere with a procedurally
+  drawn texture first, then swaps in the photographic albedo and height maps once
+  they load, so the scene is never blank and still works if they 404. The textures
+  are offset a quarter turn: their 0° longitude sits at the centre of the image,
+  while three.js' sphere UVs put `u = 0.25` at `+Z`, where the camera starts.
 - **Coordinates.** Longitude `0°` points at `-Z`, the centre of the far side.
-  three.js' default sphere UVs put `-Z` at `u = 0.75`, so the right half of the
-  generated texture is the far side and the left half is the maria-scarred near
-  side. `surfacePoint(lat, lon)` in `lib/util.js` is the single source of truth.
-- **Two paths, one Moon.** Every far-side light belongs to a `track` (`story` or
-  `discovery`). `MoonScene.setTrack()` decides which set exists on the surface, so
-  the two paths share the Moon, the flight and the camera without ever sharing a
-  constellation. Switching paths keeps everything you have already done.
+  `surfacePoint(lat, lon)` in `lib/util.js` is the single source of truth.
 - **The flight actually lands.** Before the camera swings around, the Moon is
   rotated so the selected light's longitude ends up facing the camera's final
   position, and the travelling card is slerped along a great circle in the Moon's
-  local space — so it arrives exactly on its own light rather than near it. The
-  two paths differ only in the `mood` the lighting lands on: warm, or clear.
-- **The Sun really moves.** The "dark side" reveal takes over the scene lighting
-  via `enterSunLab()`, and the slider drives `setSunAngle()` in the Moon's own
-  frame — which is what tidal locking means, so the illumination pattern stays put
-  on the surface for a given point in the cycle. It is restored on close.
+  local space — so it arrives exactly on its own light rather than near it.
 - **Lights are real buttons.** Each far-side light is a 3D sprite plus a DOM
   `<button>` projected onto it every frame, hidden when it rotates past the limb.
   So the far side is keyboard-navigable and screen-reader-visible. The ~220
-  ambient "other people" lights on the stories path are GPU points with no DOM.
-- **The widgets are reachable without a mouse.** The node maps are real buttons,
-  the lunar cycle is a range input, and the QR illustration ships with *scratch a
-  patch* / *scratch a corner square* / *repair* buttons so it can be driven from
-  the keyboard as well as by dragging.
+  ambient "other people" lights are GPU points with no DOM.
 - **Earth is only visible from the near side.** It is a real object out past the
   limb; from the far side the Moon itself occludes it. That is the point.
 - **`prefers-reduced-motion`** shortens the flight to ~2s, stills the drift
-  animations, shortens every tween, and turns the lunar-cycle autoplay into a
-  single step to New Moon.
+  animations, and shortens every tween.
 
 ## Privacy, and what this is not
 
@@ -240,14 +178,12 @@ src/
   typed here and nothing can reply. The experience links support resources
   (988 in the US/Canada, 116 123 in the UK/Ireland,
   [findahelpline.com](https://findahelpline.com) anywhere) from the opening and
-  closing screens of the human-stories path.
+  closing screens.
 
 ## Sources
 
-- The Moon, tidal locking and the lunar cycle — [NASA, *Moon facts*](https://science.nasa.gov/moon/facts/)
-- Rain, bubbles and aerosols — [MIT News, *Rainfall can release aerosols, study finds*](https://news.mit.edu/2015/rainfall-can-release-aerosols-0114)
-- QR error correction and finder patterns — [DENSO WAVE, *QR Code error correction feature*](https://www.denso-wave.com/en/system/qr/fundamental/qrcode/qrc/)
-- Data centres, power and cooling — [US DOE, *Best practices guide for energy-efficient data center design*](https://www.energy.gov/cmei/femp/articles/best-practices-guide-energy-efficient-data-center-design)
+- The Moon's near and far sides, and the lunar cycle —
+  [NASA, *Moon facts*](https://science.nasa.gov/moon/facts/)
 
 ## Credits
 

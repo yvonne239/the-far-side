@@ -27,12 +27,6 @@
   --t-uncertainty: #ffd98a;
   --t-mine:        #fff4d6;
 
-  /* the discoveries path reads clear and awake rather than warm */
-  --c-mechanism:   #5fe0cf;
-  --c-enablers:    #b9a6ff;
-  --clear:         #7fe4dc;
-  --clear-glow:    rgba(127, 228, 220, 0.3);
-
   --glass:       rgba(12, 15, 28, 0.72);
   --glass-line:  rgba(244, 241, 234, 0.14);
 
@@ -86,7 +80,6 @@ body {
 }
 body[data-dragging="true"] #scene { cursor: grabbing; }
 body[data-phase="loading"] #scene,
-body[data-phase="paths"] #scene,
 body[data-phase="intro"] #scene { cursor: default; }
 
 #vignette {
@@ -253,9 +246,6 @@ body:not([data-phase="loading"]):not([data-phase="intro"]):not([data-phase="unsu
 body[data-phase="unsupported"] .chrome { opacity: 0; pointer-events: none; }
 .chrome > * { pointer-events: auto; }
 
-/* "Paths" is the way back to the hub — no use while you are standing in it */
-body[data-phase="paths"] #btn-paths { display: none; }
-
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand__moon {
   width: 22px; height: 22px;
@@ -326,15 +316,8 @@ body[data-phase="paths"] #btn-paths { display: none; }
 }
 body[data-phase="bright"] .progress,
 body[data-phase="post"] .progress,
-body[data-phase="sights"] .progress,
-body[data-phase="sight"] .progress,
 body[data-phase="flight"] .progress,
-body[data-phase="discover"] .progress,
 body[data-phase="far"] .progress { opacity: 1; }
-
-/* the rail takes the colour of the path you are on */
-body[data-path="discovery"] .progress li.is-current { color: var(--clear); }
-body[data-path="discovery"] .progress li.is-current::before { box-shadow: 0 0 12px 2px var(--clear-glow); }
 
 .progress li {
   display: flex;
@@ -444,7 +427,7 @@ body[data-path="discovery"] .progress li.is-current::before { box-shadow: 0 0 12
 /* ---------- arrival caption ----------
 
    Sits above the Moon and the projected lights but below #ui, so a story or
-   discovery panel opening over it wins. Never takes pointer events, so it
+   story panel opening over it wins. Never takes pointer events, so it
    cannot swallow a click on a button underneath at any point in the move.   */
 
 .arrival {

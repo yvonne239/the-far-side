@@ -1,15 +1,10 @@
 import { MoonScene } from './moon/scene.js';
 import { Soundscape } from './audio/soundscape.js';
 import { Feed, createPostCard } from './ui/feed.js';
-import { Sights, createSightCard } from './ui/sights.js';
 import { FarSide } from './ui/farside.js';
-import { Discover } from './ui/discover.js';
 import { Contribute } from './ui/contribute.js';
 import { Closing } from './ui/closing.js';
 import { STORIES, THEMES, FLIGHT_LINES, getStory } from './data/stories.js';
-import {
-  DISCOVERIES, CATEGORIES, DISCOVERY_FLIGHT_LINES, getDiscovery,
-} from './data/discoveries.js';
 import * as store from './lib/storage.js';
 import { mulberry32, prefersReducedMotion } from './lib/util.js';
 
@@ -22,18 +17,14 @@ const $ = (id) => document.getElementById(id);
 const screens = {
   loading: $('screen-loading'),
   intro: $('screen-intro'),
-  paths: $('screen-paths'),
   bright: $('screen-bright'),
-  sights: $('screen-sights'),
   flight: $('screen-flight'),
   far: $('screen-far'),
-  discover: $('screen-discover'),
   unsupported: $('screen-unsupported'),
 };
 
 const overlays = {
   post: $('screen-post'),
-  sight: $('screen-sight'),
   contribute: $('screen-contribute'),
   closing: $('screen-closing'),
   notice: $('notice-safety'),
@@ -46,12 +37,8 @@ const flightFill = $('flight-fill');
 /**
  * What lands on screen when the flight ends. Two lines rather than one string
  * so the caption keeps its shape while it shrinks — no reflow mid-move.
- * Keyed by path so the two journeys can diverge here later.
  */
-const ARRIVAL_LINES = {
-  story: ["You've left the noise behind.", 'Welcome to the dark side.'],
-  discovery: ["You've left the noise behind.", 'Welcome to the dark side.'],
-};
+const ARRIVAL_LINES = ["You've left the noise behind.", 'Welcome to the dark side.'];
 
 /** How long the caption holds at full size before it docks, in ms. */
 const ARRIVAL_HOLD = 2800;
@@ -60,23 +47,14 @@ const ARRIVAL_HOLD_REDUCED = 900;
 /** Must match the transform transition on .arrival__text in base.css. */
 const ARRIVAL_GLIDE = 1150;
 
-/** The same five beats, named for whichever path the visitor took. */
-const RAILS = {
-  story:     ['Arrive', 'Fly', 'Discover', 'Respond', 'Return'],
-  discovery: ['Look', 'Flip', 'Reveal', 'Connect', 'Return'],
-};
-
 /* ================================================================
    state
    ================================================================ */
 
 const state = {
   phase: 'loading',
-  path: null,             // 'story' | 'discovery'
   selectedPost: null,     // story chosen on the near side
   currentStory: null,     // story open on the far side
-  selectedSight: null,    // discovery chosen on the near side
-  currentDiscovery: null, // discovery open on the far side
   flying: false,
   flightLines: FLIGHT_LINES,
   flightLineIndex: -1,
@@ -87,13 +65,10 @@ sound.muted = store.isMuted();
 
 let scene;
 let feed;
-let sights;
 let farSide;
-let discover;
 let contribute;
 let closing;
 let myLights = [];
-let discovered = [];
 let signalCounter = 0;
 
 /* ================================================================
@@ -134,10 +109,9 @@ const arrival = {
   lines: [...$('arrival').querySelectorAll('.arrival__line')],
   timer: null,
 
-  play(path) {
+  play() {
     this.clear();
-    const copy = ARRIVAL_LINES[path] || ARRIVAL_LINES.story;
-    this.lines.forEach((el, i) => { el.textContent = copy[i] || ''; });
+    this.lines.forEach((el, i) => { el.textContent = ARRIVAL_LINES[i] || ''; });
 
     // Pin the start state and flush it synchronously, so the fade has
     // somewhere to animate from. A forced reflow rather than rAF: rAF is
@@ -177,21 +151,13 @@ const arrival = {
 const LIGHT_LANDED = 'Your light has joined the dark side.';
 
 /**
- * The panel opens once the caption has finished moving, not during. Mounting a
- * discovery widget is the heaviest thing that happens on arrival, and doing it
- * mid-glide makes the caption stutter on anything slow.
+ * The panel opens once the caption has finished moving, not during, so the
+ * two never fight for attention on the way in.
  */
 function arrivalPanelDelay() {
   return prefersReducedMotion()
     ? ARRIVAL_HOLD_REDUCED + 300
     : ARRIVAL_HOLD + ARRIVAL_GLIDE + 120;
-}
-
-function setRail(path) {
-  const labels = RAILS[path] || RAILS.story;
-  progressEl.querySelectorAll('li').forEach((li, i) => {
-    li.querySelector('span').textContent = labels[i];
-  });
 }
 
 function setProgress(step) {
@@ -269,87 +235,27 @@ function visibleStoryIds() {
   });
 }
 
-/** Everything currently lit on the discovery track, in orbit order. */
-function visibleDiscoveryIds() {
-  if (!scene || scene.filter === 'all') return DISCOVERIES.map((d) => d.id);
-  return DISCOVERIES.filter((d) => d.category === scene.filter).map((d) => d.id);
-}
-
 /* ================================================================
-   0 · arrive, then choose a path
+   0 · arrive
    ================================================================ */
 
 function begin() {
   sound.init();
   sound.setMuted(store.isMuted());
-  goToPaths({ fresh: true });
+  startJourney();
 }
 
-/**
- * The hub. Reachable from anywhere, from the intro onward, and deliberately
- * non-destructive: signals, reflections and flipped discoveries all survive.
- */
-function goToPaths({ fresh = false } = {}) {
-  Object.keys(overlays).forEach((k) => setOverlay(k, false));
-  if (farSide) farSide.close();
-  if (discover) discover.close();
-  arrival.clear();
-  if (feed) feed.stopToasts();
-  if (scene) scene.resetCamera();
-
-  state.selectedPost = null;
-  state.currentStory = null;
-  state.selectedSight = null;
-  state.currentDiscovery = null;
-  state.flying = false;
-
-  if (!fresh && state.path) setProgress('closing');
-  setPhase('paths');
-  sound.fadeOutAll(fresh ? 0.4 : 1.2);
-  setTimeout(() => {
-    const card = document.querySelector(`.path-card[data-path="${state.path || 'story'}"]`);
-    if (card && state.phase === 'paths') card.focus();
-  }, 420);
-}
-
-/** Jump straight from one path's far side to the other path's near side. */
-function switchPath(path) {
-  Object.keys(overlays).forEach((k) => setOverlay(k, false));
-  farSide.close();
-  discover.close();
-  arrival.clear();
-  scene.resetCamera();
-  scene.setActiveLight(null);
-  state.selectedPost = null;
-  state.currentStory = null;
-  state.selectedSight = null;
-  state.currentDiscovery = null;
-  state.flying = false;
-  choosePath(path);
-}
-
-function choosePath(path) {
-  state.path = path;
-  document.body.dataset.path = path;
-  setRail(path);
+/** Drop the visitor on the near side and let the feed start drifting. */
+function startJourney() {
   setProgress('bright');
-  scene.setTrack(path);
-
-  if (path === 'story') {
-    farSide.setFilter('all');
-    sound.startBright();
-    setPhase('bright');
-    feed.startToasts();
-  } else {
-    discover.setFilter('all');
-    sights.markSeen(discovered);
-    sound.startHum();
-    setPhase('sights');
-  }
+  farSide.setFilter('all');
+  sound.startBright();
+  setPhase('bright');
+  feed.startToasts();
 }
 
 /* ================================================================
-   PATH ONE · Behind the Moment
+   the journey
    ================================================================ */
 
 function selectPost(id) {
@@ -385,7 +291,6 @@ function flyToOwnLight(id, opts = {}) {
   feed.stopToasts();
   startFlight(id, {
     lines: FLIGHT_LINES,
-    mood: 'warm',
     crossfade: () => sound.crossfadeToFar(prefersReducedMotion() ? 1.4 : 6),
     arrive: () => enterFarSide(id, opts),
   });
@@ -400,7 +305,6 @@ function seeOtherSide() {
   feed.stopToasts();
   startFlight(id, {
     lines: FLIGHT_LINES,
-    mood: 'warm',
     crossfade: () => sound.crossfadeToFar(prefersReducedMotion() ? 1.4 : 6),
     arrive: () => enterFarSide(id),
   });
@@ -411,7 +315,7 @@ function enterFarSide(focusId, { landed = false } = {}) {
   setProgress('far');
   sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
   if (landed) arrival.flash(LIGHT_LANDED);
-  else arrival.play('story');
+  else arrival.play();
   farSide.setCount(store.signalCount());
   const delay = landed ? 900 : arrivalPanelDelay();
   if (focusId) setTimeout(() => openStory(focusId, { skipFocus: true }), delay);
@@ -514,94 +418,10 @@ function openClosing() {
 }
 
 /* ================================================================
-   PATH TWO · Hidden in Plain Sight
+   the flight
    ================================================================ */
 
-function selectSight(id) {
-  const d = getDiscovery(id);
-  if (!d) return;
-  state.selectedSight = id;
-
-  const host = $('sight-card');
-  host.textContent = '';
-  host.appendChild(createSightCard(d, { hero: true }));
-  $('sight-hint').textContent = CATEGORIES[d.category].blurb;
-
-  setOverlay('sight', true);
-  sound.tick();
-  setTimeout(() => $('btn-flip-moon').focus(), 320);
-}
-
-function closeSight() {
-  setOverlay('sight', false);
-  state.selectedSight = null;
-}
-
-function flipToDiscovery() {
-  const id = state.selectedSight;
-  if (!id || state.flying) return;
-
-  state.flying = true;
-  setOverlay('sight', false);
-  startFlight(id, {
-    lines: DISCOVERY_FLIGHT_LINES,
-    mood: 'cool',
-    crossfade: () => sound.crossfadeToOpen(prefersReducedMotion() ? 1.4 : 6),
-    arrive: () => enterDiscover(id),
-  });
-}
-
-function enterDiscover(focusId) {
-  setPhase('discover');
-  setProgress('far');
-  sound.startTheme(prefersReducedMotion() ? 1.2 : 5);
-  arrival.play('discovery');
-  discover.setCount(discovered.length, DISCOVERIES.length);
-  if (focusId) setTimeout(() => openDiscovery(focusId, { skipFocus: true }), arrivalPanelDelay());
-}
-
-function openDiscovery(id, { skipFocus = false } = {}) {
-  const d = getDiscovery(id);
-  if (!d) return;
-  state.currentDiscovery = id;
-  discover.show(d);
-  scene.setActiveLight(id);
-  if (!skipFocus) scene.focusLight(id);
-  sound.tick();
-}
-
-function stepDiscovery(delta) {
-  const ids = visibleDiscoveryIds();
-  if (!ids.length) return;
-  const at = ids.indexOf(state.currentDiscovery);
-  const next = ids[(at + delta + ids.length) % ids.length];
-  openDiscovery(next);
-}
-
-function markRevealed(id) {
-  discovered = store.markDiscovered(id);
-  scene.markSignalled(id);
-  discover.setCount(discovered.length, DISCOVERIES.length);
-  sights.markSeen(discovered);
-}
-
-function backToSights() {
-  discover.close();
-  arrival.clear();
-  state.currentDiscovery = null;
-  scene.resetCamera();
-  scene.setActiveLight(null);
-  sights.markSeen(discovered);
-  sound.startHum();
-  setPhase('sights');
-  setProgress('bright');
-}
-
-/* ================================================================
-   the flight, shared by both paths
-   ================================================================ */
-
-function startFlight(id, { lines, mood, crossfade, arrive }) {
+function startFlight(id, { lines, crossfade, arrive }) {
   arrival.clear();
   state.flightLines = lines;
   state.flightLineIndex = -1;
@@ -613,7 +433,6 @@ function startFlight(id, { lines, mood, crossfade, arrive }) {
   scene
     .flyToFarSide(id, {
       duration: prefersReducedMotion() ? 2200 : 7400,
-      mood,
       onProgress: updateFlightHud,
     })
     .then(() => {
@@ -644,20 +463,13 @@ function restart() {
   Object.keys(overlays).forEach((k) => setOverlay(k, false));
   arrival.clear();
   farSide.close();
-  farSide.setFilter('all');
-  discover.close();
-  discover.setFilter('all');
   scene.resetCamera();
+  scene.setActiveLight(null);
   state.selectedPost = null;
   state.currentStory = null;
-  state.selectedSight = null;
-  state.currentDiscovery = null;
   state.flying = false;
   $('far-hint').textContent = 'Drag to turn the Moon. Every light is a story someone did not post.';
-  $('discover-hint').textContent = 'Drag to turn the Moon. Every light is something you already walk past.';
-
-  if (state.path) choosePath(state.path);
-  else goToPaths({ fresh: true });
+  startJourney();
 }
 
 /* ================================================================
@@ -695,12 +507,8 @@ function wireNotices() {
 }
 
 function boot() {
-  scene.onLightClick = (id) =>
-    (state.path === 'discovery' ? openDiscovery(id) : openStory(id));
+  scene.onLightClick = (id) => openStory(id);
   scene.setStories(STORIES);
-  scene.setDiscoveries(DISCOVERIES, CATEGORIES);
-
-  discovered = store.getDiscovered();
 
   feed = new Feed({
     root: $('feed'),
@@ -708,12 +516,6 @@ function boot() {
     stories: STORIES,
     onSelect: selectPost,
     onSelectMine: (id) => flyToOwnLight(id),
-  });
-
-  sights = new Sights({
-    root: $('sights'),
-    discoveries: DISCOVERIES,
-    onSelect: selectSight,
   });
 
   farSide = new FarSide({
@@ -734,56 +536,26 @@ function boot() {
     },
   });
 
-  discover = new Discover({
-    scene,
-    sound,
-    onFilter: (key) => {
-      scene.setFilter(key);
-      const ids = visibleDiscoveryIds();
-      const label = (CATEGORIES[key]?.short || '').toLowerCase();
-      $('discover-hint').textContent = ids.length
-        ? `${ids.length} ${key === 'all' ? 'discoveries' : `“${label}” discoveries`} lit. Drag to turn the Moon.`
-        : 'Nothing lit under that question yet.';
-      if (state.currentDiscovery && !ids.includes(state.currentDiscovery)) discover.close();
-    },
-    onStep: stepDiscovery,
-    onRevealed: markRevealed,
-    onConnect: () => setProgress('signal'),
-    onClose: () => {
-      state.currentDiscovery = null;
-      scene.setActiveLight(null);
-    },
-  });
-
   contribute = new Contribute({ onSave: saveReflection, onDelete: deleteReflection });
   closing = new Closing({
     onChoose: (id) => { store.setChosenAction(id); sound.tick(); },
   });
 
   $('btn-begin').addEventListener('click', begin);
-  document.querySelectorAll('.path-card').forEach((card) =>
-    card.addEventListener('click', () => choosePath(card.dataset.path)));
-
   $('btn-see-other-side').addEventListener('click', seeOtherSide);
   // from a sample post straight into writing your own, without the detour
   // through the far side
   $('btn-write-own').addEventListener('click', () => { closePost(); openContribute(); });
-  $('btn-flip-moon').addEventListener('click', flipToDiscovery);
   $('btn-skip').addEventListener('click', () => scene.skipFlight());
   $('btn-contribute').addEventListener('click', openContribute);
   $('btn-contribute-near').addEventListener('click', openContribute);
   $('btn-return').addEventListener('click', openClosing);
   $('btn-back-to-far').addEventListener('click', () => setOverlay('closing', false));
-  $('btn-back-to-sights').addEventListener('click', backToSights);
-  $('btn-other-path').addEventListener('click', () => switchPath('story'));
-  $('btn-try-other').addEventListener('click', () => switchPath('discovery'));
-  $('btn-paths').addEventListener('click', () => goToPaths());
+  $('btn-restart-2').addEventListener('click', restart);
   $('btn-restart').addEventListener('click', restart);
 
   document.querySelectorAll('[data-close-post]').forEach((b) =>
     b.addEventListener('click', closePost));
-  document.querySelectorAll('[data-close-sight]').forEach((b) =>
-    b.addEventListener('click', closeSight));
   document.querySelectorAll('[data-close-contribute]').forEach((b) =>
     b.addEventListener('click', () => setOverlay('contribute', false)));
 
@@ -793,9 +565,7 @@ function boot() {
       if (overlays.contribute.classList.contains('is-active')) setOverlay('contribute', false);
       else if (overlays.closing.classList.contains('is-active')) setOverlay('closing', false);
       else if (overlays.post.classList.contains('is-active')) closePost();
-      else if (overlays.sight.classList.contains('is-active')) closeSight();
       else if (farSide.isOpen) farSide.close();
-      else if (discover.isOpen) discover.close();
       return;
     }
     if (state.phase === 'flight' && (e.key === 'Enter' || e.key === ' ') && !anyOverlayOpen()) {
@@ -818,7 +588,7 @@ function boot() {
   window.addEventListener('pointerdown', () => sound.resume(), { once: true });
 
   // a small handle for judges and debugging
-  window.Moonflip = { scene, sound, store, restart, goToPaths, choosePath, state };
+  window.Moonflip = { scene, sound, store, restart, state };
 }
 
 wireSoundToggle();

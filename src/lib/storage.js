@@ -11,7 +11,6 @@ const KEYS = {
   signals: `${PREFIX}signals`,
   muted: `${PREFIX}muted`,
   action: `${PREFIX}action`,
-  discovered: `${PREFIX}discovered`,
 };
 
 function read(key, fallback) {
@@ -81,22 +80,6 @@ export function addSignal(storyId, text) {
 
 export function signalCount() {
   return Object.values(getSignals()).reduce((n, list) => n + list.length, 0);
-}
-
-/* ---------- discoveries already flipped ---------- */
-
-export function getDiscovered() {
-  const list = read(KEYS.discovered, []);
-  return Array.isArray(list) ? list : [];
-}
-
-export function markDiscovered(id) {
-  const list = getDiscovered();
-  if (!list.includes(id)) {
-    list.push(id);
-    write(KEYS.discovered, list);
-  }
-  return list;
 }
 
 /* ---------- small preferences ---------- */

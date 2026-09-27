@@ -94,6 +94,14 @@ export class MoonMusic {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       this.buffer = await this.ctx.decodeAudioData(await res.arrayBuffer());
+
+      // The file is several megabytes, so a quick visitor can reach the far
+      // side before it finishes decoding. Rather than leaving them on the
+      // stand-in for the whole session, swap to the recording now.
+      if (this.playing && !this._source) {
+        this._stopSequencer();
+        this._startRecording();
+      }
       return true;
     } catch (err) {
       console.warn(`Moonflip: could not load ${url}, using the built-in instrumental.`, err);
@@ -112,12 +120,17 @@ export class MoonMusic {
   stop() {
     if (!this.playing) return;
     this.playing = false;
-    if (this._timer) clearTimeout(this._timer);
-    this._timer = null;
+    this._stopSequencer();
     if (this._source) {
       try { this._source.stop(this.ctx.currentTime + 0.05); } catch { /* already stopped */ }
       this._source = null;
     }
+  }
+
+  /** Halts the scheduler without touching `playing`. */
+  _stopSequencer() {
+    if (this._timer) clearTimeout(this._timer);
+    this._timer = null;
   }
 
   /* ---------- a supplied recording ---------- */
